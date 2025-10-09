@@ -1,0 +1,15 @@
+
+# Ultralytics YOLOv8 Dataset YAML for Raw Ingredients
+
+# Dataset Root
+path: C:\Users\jemap\Documents\Meal-Plan-App\OID_YOLO_DATA
+
+# Train/Val/Test data (assuming FiftyOne exported a single 'train' split)
+train: images
+val: images
+
+# Number of classes
+nc: 11
+
+# Class Names
+names: ['Apple', 'Banana', 'Broccoli', 'Carrot', 'Tomato', 'Orange', 'Potato', 'Cucumber', 'Bell pepper', 'Cheese', 'Chicken']

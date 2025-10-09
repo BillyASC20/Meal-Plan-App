@@ -1,0 +1,31 @@
+# === GIT IGNORE FILE FOR PYTHON/ULTRALYTICS PROJECT ===
+
+# 1. PYTHON ENVIRONMENT AND CACHE
+# Ignore the environment folder created by 'python -m venv'
+env/
+venv/
+
+# Ignore Python's compiled bytecode files
+__pycache__/
+*.pyc
+
+# 2. ULTRALYTICS & DATA GENERATION OUTPUTS
+# Ignore the main Ultralytics output folder (training logs, plots, checkpoints)
+# This directory contains large model files (best.pt, last.pt)
+runs/
+
+# Ignore the large directory created by the FiftyOne script
+# We ignore this because it contains thousands of images downloaded from OID
+OID_YOLO_DATA/
+
+# Ignore model weight files (if you don't want to track them separately)
+# If you decide to track the FINAL best.pt model, delete this line.
+*.pt
+
+# 3. IDE / SYSTEM FILES
+# Ignore standard VS Code folders and files
+.vscode/
+# Ignore macOS system files (if you work on a Mac)
+.DS_Store
+# Ignore Windows thumbnail cache
+Thumbs.db
