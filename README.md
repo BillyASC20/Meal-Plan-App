@@ -52,6 +52,9 @@ This step executes your prepare_dataset.py script to download a filtered subset 
 
 Action: Run the preparation script
 
+# Adjust: Start with 500-1000 for a quick test; increase for better results
+The default is 10 just for testing.
+
 ```bash
 python prepare_dataset.py
 ```
@@ -81,6 +84,13 @@ epochs=	    50	                    Number of cycles over the dataset (recommende
 batch=	    8	                    Processes 8 images per step (safe value for CPU/standard RAM).
 
 device=	    cpu	                    Forces CPU utilization to avoid AMD/CUDA errors.
+
+or you can use the script to train the model.
+```bash
+python train_model.py
+```
+# Choose the how many epochs you want.
+
 
 ## B. Monitoring and Output
 The training will take several hours on a CPU.
