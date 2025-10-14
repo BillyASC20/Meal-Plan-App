@@ -5,11 +5,39 @@ import os
 
 # --- CONFIGURATION ---
 # ⚠️ IMPORTANT: Replace this with YOUR comprehensive list of raw ingredients!
+# TARGET_CLASSES = [
+#     "Apple", "Banana", "Broccoli", "Carrot", "Tomato", 
+#     "Orange", "Potato", "Cucumber", "Bell pepper", "Cheese", "Chicken"
+# ] 
+
+#updated classes that are taken directly from zoolist1.py output.
+#there are 601 
 TARGET_CLASSES = [
-    "Apple", "Banana", "Broccoli", "Carrot", "Tomato", 
-    "Orange", "Potato", "Cucumber", "Bell pepper", "Cheese", "Chicken"
-] 
-MAX_SAMPLES = 10  # Adjust: Start with 500-1000 for a quick test; increase for better results
+    # --- Produce / Raw Ingredients (25) ---
+    "Apple", "Artichoke", "Banana", "Bell pepper", "Broccoli", 
+    "Cabbage", "Cantaloupe", "Carrot", "Coconut", "Cucumber", 
+    "Common fig", "Grape", "Grapefruit", "Lemon", "Mango", 
+    "Mushroom", "Orange", "Peach", "Pear", "Pineapple", 
+    "Pomegranate", "Potato", "Pumpkin", "Radish", "Tomato",
+    "Zucchini", "Garden Asparagus",
+    
+    # --- Staples / Dairy / Baked Goods (15) ---
+    "Bagel", "Baked goods", "Bread", "Butter", "Cake", 
+    "Cheese", "Cookie", "Cream", "Croissant", "Dairy Product", 
+    "Dessert", "Doughnut", "Egg (Food)", "Ice cream", "Milk", 
+    "Pancake", "Pasta", "Pastry", "Pretzel",
+    
+    # --- Prepared Food / Seafood (15) ---
+    "Burrito", "Chicken", "Crab", "Fast food", "Fish", 
+    "French fries", "Hamburger", "Hot dog", "Oyster", "Pizza", 
+    "Salad", "Sandwich", "Seafood", "Shrimp", "Snack", 
+    "Squid", "Sushi", "Taco", "Tart", "Turkey",
+    
+    # --- Drinks / Condiments (5) ---
+    "Beer", "Cocktail", "Coffee", "Drink", "Juice",
+    "Tea", "Wine"
+]
+MAX_SAMPLES = 500  # Adjust: Start with 500-1000 for a quick test; increase for better results
 DATASET_NAME = "oid-raw-ingredients"
 
 # Set the directory where FiftyOne will store the raw dataset

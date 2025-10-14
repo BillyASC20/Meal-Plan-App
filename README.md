@@ -87,7 +87,7 @@ device=	    cpu	                    Forces CPU utilization to avoid AMD/CUDA err
 
 or you can use the script to train the model.
 ```bash
-python train_model.py
+python train.py
 ```
 # Choose the how many epochs you want.
 
