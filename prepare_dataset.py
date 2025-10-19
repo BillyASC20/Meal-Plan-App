@@ -37,7 +37,7 @@ TARGET_CLASSES = [
     "Beer", "Cocktail", "Coffee", "Drink", "Juice",
     "Tea", "Wine"
 ]
-MAX_SAMPLES = 500  # Adjust: Start with 500-1000 for a quick test; increase for better results
+MAX_SAMPLES = 5000  # Adjust: Start with 500-1000 for a quick test; increase for better results
 DATASET_NAME = "oid-raw-ingredients"
 
 # Set the directory where FiftyOne will store the raw dataset

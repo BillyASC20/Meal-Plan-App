@@ -1,4 +1,4 @@
-# === GIT IGNORE FILE FOR PYTHON/ULTRALYTICS PROJECT ===
+# === GIT IGNORE FILE ===
 
 # 1. PYTHON ENVIRONMENT AND CACHE
 # Ignore the environment folder created by 'python -m venv'
@@ -18,9 +18,12 @@ runs/
 # We ignore this because it contains thousands of images downloaded from OID
 OID_YOLO_DATA/
 
-# Ignore model weight files (if you don't want to track them separately)
-# If you decide to track the FINAL best.pt model, delete this line.
-*.pt
+# Ignore all JPEG and PNG files in the current directory (project root)
+# This covers: apple.jpg, banana.jpg, eggs.jpg, eggs2.jpg, eggs3.jpg, 
+# ingredients2.png, ingredients3.png, ingredients4.png, ingredients5.png, ingredients6.png
+*.jpg
+*.png
+*.mp4
 
 # 3. IDE / SYSTEM FILES
 # Ignore standard VS Code folders and files

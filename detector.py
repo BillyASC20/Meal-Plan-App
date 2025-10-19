@@ -3,17 +3,17 @@ from ultralytics import YOLO
 
 # --- MODEL PATH CHANGE ---
 # 1. Load the Custom Trained Model
-CUSTOM_MODEL_PATH = 'runs/detect/raw_food_ingredients_detector_CPU/weights/best.pt'
+CUSTOM_MODEL_PATH = 'raw_food_ingredients_GPU/raw_food_ingredients_detector_GPU3/weights/best.pt'
 model = YOLO(CUSTOM_MODEL_PATH)
 # -------------------------
 
 # 2. Define the Input Source
-image_source = 'ingredients3.jpg'
+image_source = 'eggs3.jpg'  # Change this to your image path or use 0 for webcam
 
 # 3. Run Prediction (Inference)
 # Pass save=False to disable saving the image to the 'runs/' folder.
 # We also set verbose=False to minimize command line clutter.
-results = model.predict(source=image_source, save=False, verbose=False)
+results = model.predict(source=image_source, save=True, verbose=False)
 
 # 4. Process and Extract UNIQUE Names
 #detected_names = set() # Use a set to automatically store only unique names

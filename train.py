@@ -13,7 +13,7 @@ MODEL_WEIGHTS = 'yolov8n.pt'
 TRAINING_ARGS = {
     'data': DATA_YAML_PATH,         # Your custom dataset configuration
     'model': MODEL_WEIGHTS,         # The pre-trained YOLOv8 Nano model
-    'epochs': 50,                   # Number of training cycles
+    'epochs': 200,                   # Number of training cycles
     'imgsz': 640,                   # Input image size
     'batch': 8,                     # Batch size (set low for CPU/limited VRAM)
     'name': 'raw_food_ingredients_detector_CPU', # Name for the output runs folder

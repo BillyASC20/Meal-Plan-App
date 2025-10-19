@@ -1,0 +1,15 @@
+
+# Ultralytics YOLOv8 Dataset YAML for Raw Ingredients
+
+# Dataset Root
+path: C:\Users\jemap\Documents\Meal-Plan-App\OID_YOLO_DATA
+
+# Train/Val/Test data (assuming FiftyOne exported a single 'train' split)
+train: images
+val: images
+
+# Number of classes
+nc: 73
+
+# Class Names
+names: ['Apple', 'Artichoke', 'Banana', 'Bell pepper', 'Broccoli', 'Cabbage', 'Cantaloupe', 'Carrot', 'Coconut', 'Cucumber', 'Common fig', 'Grape', 'Grapefruit', 'Lemon', 'Mango', 'Mushroom', 'Orange', 'Peach', 'Pear', 'Pineapple', 'Pomegranate', 'Potato', 'Pumpkin', 'Radish', 'Tomato', 'Zucchini', 'Garden Asparagus', 'Bagel', 'Baked goods', 'Bread', 'Butter', 'Cake', 'Cheese', 'Cookie', 'Cream', 'Croissant', 'Dairy Product', 'Dessert', 'Doughnut', 'Egg (Food)', 'Ice cream', 'Milk', 'Pancake', 'Pasta', 'Pastry', 'Pretzel', 'Burrito', 'Chicken', 'Crab', 'Fast food', 'Fish', 'French fries', 'Hamburger', 'Hot dog', 'Oyster', 'Pizza', 'Salad', 'Sandwich', 'Seafood', 'Shrimp', 'Snack', 'Squid', 'Sushi', 'Taco', 'Tart', 'Turkey', 'Beer', 'Cocktail', 'Coffee', 'Drink', 'Juice', 'Tea', 'Wine']
