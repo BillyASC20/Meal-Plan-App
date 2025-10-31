@@ -18,33 +18,30 @@ class RecipeList(BaseModel):
     recipes: List[Recipe] = Field(..., min_length=1, max_length=10)
 
 class OpenAIService:
-    SYSTEM_PROMPT = """You are a concise, professional recipe developer.
-
-Respond ONLY with valid JSON shaped exactly as:
+    SYSTEM_PROMPT = """You are an expert chef AI. Generate detailed, professional recipes as JSON matching this exact structure:
 {
-    "recipes": [
-        {
-            "title": "Recipe Name",
-            "meal_type": "breakfast|lunch|dinner|snack|dessert|drink",
-            "cook_time": 30,
-            "servings": 4,
-            "difficulty": "easy|medium|hard",
-            "ingredients": ["2 cups all-purpose flour", "1 tsp salt", "3 large eggs"],
-            "steps": ["Preheat oven to 350°F. Grease a 9x13 pan.", "In a large bowl, whisk together flour and salt.", "Add eggs one at a time, beating well after each addition."],
-            "tags": ["vegetarian", "quick", "family-friendly"]
-        }
-    ]
+  "recipes": [
+    {
+      "title": "Recipe Name",
+      "meal_type": "breakfast|lunch|dinner|snack|dessert|drink",
+      "cook_time": 30,
+      "servings": 4,
+      "difficulty": "easy|medium|hard",
+      "ingredients": ["2 cups all-purpose flour", "1 tsp salt", "3 large eggs"],
+      "steps": ["Preheat oven to 350°F. Grease a 9x13 pan.", "In a large bowl, whisk together flour and salt.", "Add eggs one at a time, beating well after each addition."],
+      "tags": ["vegetarian", "quick", "family-friendly"]
+    }
+  ]
 }
 
-Rules:
-- Use ONLY user ingredients plus salt, black pepper, cooking oil (olive/vegetable), and water. Do not invent anything else.
-- Each recipe can use any subset of their list; quality over quantity.
-- Keep instructions realistic, actionable, and cookable at home.
-- Include specific measurements and add temperatures/times when they matter.
-- 1–2 sentences per step; keep tone matter-of-fact.
-- No markdown fences, no narration, no extra text before/after JSON.
-- Streaming-friendly: start with {, keep well-formed JSON, close with }.
-"""
+IMPORTANT REQUIREMENTS:
+- Include PRECISE measurements in ingredients (cups, tbsp, oz, grams, etc.)
+- Include DETAILED cooking temperatures and times in steps
+- Make steps clear and specific (not just "mix ingredients")
+- Add helpful cooking tips in steps when relevant
+- Each step should be 1-2 sentences with actionable instructions
+- Use the provided ingredients creatively but realistically
+Return ONLY valid JSON. No markdown, no explanations."""
 
     def __init__(self):
         api_key = os.getenv('OPENAI_API_KEY')
@@ -52,34 +49,16 @@ Rules:
             raise ValueError("OPENAI_API_KEY not set")
         self.client = OpenAI(api_key=api_key)
 
-    def generate_recipes_stream(self, ingredients, meal_type=None):
-        meal_type_requirement = ""
-        meal_type_json_field = ""
-        
-        if meal_type:
-            meal_type_requirement = f"""
+    def generate_recipes_stream(self, ingredients):
+        prompt = f"""Create 3-5 detailed, delicious recipes using these ingredients: {', '.join(ingredients)}.
 
-CRITICAL MEAL TYPE REQUIREMENT
-- You MUST ONLY generate {meal_type.upper()} recipes
-- Every single recipe must have "meal_type": "{meal_type}" in the JSON
-- DO NOT create breakfast recipes if this is lunch or dinner
-- DO NOT create lunch recipes if this is breakfast or dinner  
-- DO NOT create dinner recipes if this is breakfast or lunch
-- ONLY generate recipes appropriate for {meal_type}
-- Think about what people traditionally eat for {meal_type} and the portion sizes appropriate for that meal
-- Consider the time of day and energy needs for {meal_type}
-- If you cannot create good {meal_type} recipes with these ingredients, create fewer recipes (even just 1-2) but ALL must be {meal_type}
-- Recipes must be dishes that make sense for {meal_type} based on culinary tradition and common eating habits"""
-            meal_type_json_field = f' and MUST have "meal_type": "{meal_type}"'
-        
-        prompt = f"""Available ingredients (only use these + salt/pepper/oil/water): {', '.join(ingredients)}
-
-    Create 3-5 real, cookable meal ideas from this list. Balanced, satisfying dishes that someone would actually make at home. Quality beats quantity; if the list is sparse, fewer strong recipes are fine.{meal_type_requirement}
-
-    Output rules:
-    - Use the exact JSON shape from the system prompt; no markdown.
-    - Keep measurements specific and instructions concise with temps/times when relevant.
-    - Each recipe{meal_type_json_field} must be realistic and achievable with the provided items only."""
+Requirements:
+- Use realistic cooking techniques and combinations
+- Include precise measurements for all ingredients
+- Provide detailed, step-by-step cooking instructions
+- Add cooking temperatures, times, and helpful tips
+- Make recipes that someone could actually cook
+- Include a mix of meal types (breakfast, lunch, dinner, etc.)"""
         
         stream = self.client.chat.completions.create(
             model="gpt-4o-mini",
@@ -95,34 +74,16 @@ CRITICAL MEAL TYPE REQUIREMENT
             if chunk.choices[0].delta.content:
                 yield chunk.choices[0].delta.content
 
-    def generate_recipes_from_ingredients(self, ingredients, meal_type=None):
-        meal_type_requirement = ""
-        meal_type_json_field = ""
-        
-        if meal_type:
-            meal_type_requirement = f"""
+    def generate_recipes_from_ingredients(self, ingredients):
+        prompt = f"""Create 3-5 detailed, delicious recipes using these ingredients: {', '.join(ingredients)}.
 
-CRITICAL MEAL TYPE REQUIREMENT
-- You MUST ONLY generate {meal_type.upper()} recipes
-- Every single recipe must have "meal_type": "{meal_type}" in the JSON
-- DO NOT create breakfast recipes if this is lunch or dinner
-- DO NOT create lunch recipes if this is breakfast or dinner  
-- DO NOT create dinner recipes if this is breakfast or lunch
-- ONLY generate recipes appropriate for {meal_type}
-- Think about what people traditionally eat for {meal_type} and the portion sizes appropriate for that meal
-- Consider the time of day and energy needs for {meal_type}
-- If you cannot create good {meal_type} recipes with these ingredients, create fewer recipes (even just 1-2) but ALL must be {meal_type}
-- Recipes must be dishes that make sense for {meal_type} based on culinary tradition and common eating habits"""
-            meal_type_json_field = f' and MUST have "meal_type": "{meal_type}"'
-        
-        prompt = f"""Available ingredients (only use these + salt/pepper/oil/water): {', '.join(ingredients)}
-
-    Create 3-5 real, cookable meal ideas from this list. Balanced, satisfying dishes that someone would actually make at home. Quality beats quantity; if the list is sparse, fewer strong recipes are fine.{meal_type_requirement}
-
-    Output rules:
-    - Use the exact JSON shape from the system prompt; no markdown.
-    - Keep measurements specific and instructions concise with temps/times when relevant.
-    - Each recipe{meal_type_json_field} must be realistic and achievable with the provided items only."""
+Requirements:
+- Use realistic cooking techniques and combinations
+- Include precise measurements for all ingredients
+- Provide detailed, step-by-step cooking instructions
+- Add cooking temperatures, times, and helpful tips
+- Make recipes that someone could actually cook
+- Include a mix of meal types (breakfast, lunch, dinner, etc.)"""
         
         response = self.client.chat.completions.create(
             model="gpt-4o-mini",
