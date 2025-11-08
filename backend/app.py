@@ -3,17 +3,16 @@ import base64
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from dotenv import load_dotenv
-from .recipe_generator import RecipeGenerator
-from .vision_service import vision_service
-import base64
+from recipe_generator import RecipeGenerator
+from vision_service import vision_service
 from pathlib import Path
 
 # Load environment variables
 load_dotenv()
 
 app = Flask(__name__)
-# Enable CORS for frontend communication
-CORS(app)
+# Enable CORS for frontend communication - allow all origins for development
+CORS(app, resources={r"/*": {"origins": "*"}})
 
 # Initialize the recipe generator
 recipe_gen = RecipeGenerator()
@@ -27,11 +26,14 @@ def detect_ingredients():
             return jsonify({"status": "error", "message": "No image data provided"}), 400
 
         image_data = data['image']
+        print(f"[detect] Received image data, length: {len(image_data)}")
+        
         # Use local model; prefer the helper that accepts base64 and returns
         # multiple predictions with confidences.
         # detect_with_confidence handles tiling, detection/classification heads
         # and returns a list like [{"name": str, "confidence": float}, ...]
-        preds = vision_service.detect_with_confidence(image_data, topk=8)
+        preds = vision_service.detect_with_confidence(image_data, topk=25)  # Increased from 15 to 25
+        print(f"[detect] Got {len(preds)} predictions from vision service")
 
         # Normalize ingredients: if preds is a list of dicts, pull 'name',
         # otherwise if it's a list of strings use it directly.
@@ -59,6 +61,9 @@ def detect_ingredients():
         message = None
         if not ingredients:
             message = "nothing_detected"
+            print("[detect] ⚠️  No ingredients detected!")
+        else:
+            print(f"[detect] ✅ Returning {len(ingredients)} ingredients: {ingredients[:5]}")
 
         return jsonify({
             "status": "success",
@@ -101,9 +106,9 @@ def debug_hero_b64():
 def debug_sample_detections():
     """Return a canned multi-item detection result for frontend testing."""
     sample_preds = [
-        {"name": "apple", "confidence": 0.92},
-        {"name": "banana", "confidence": 0.81},
-        {"name": "broccoli", "confidence": 0.66},
+        {"name": "apple", "confidence": 0.92, "bbox": {"x1": 100, "y1": 150, "x2": 300, "y2": 350}},
+        {"name": "banana", "confidence": 0.81, "bbox": {"x1": 350, "y1": 200, "x2": 550, "y2": 400}},
+        {"name": "broccoli", "confidence": 0.66, "bbox": {"x1": 600, "y1": 100, "x2": 800, "y2": 300}},
     ]
     ingredients = [p["name"] for p in sample_preds]
     return jsonify({
@@ -147,8 +152,9 @@ def generate_recipes():
 
 if __name__ == '__main__':
     # Use environment variables for configuration, with sensible defaults
-    port = int(os.getenv('PORT', 5000))
-    host = os.getenv('HOST', '127.0.0.1')
+    port = int(os.getenv('PORT', 5001))  # Changed from 5000 to 5001 to avoid AirPlay
+    host = os.getenv('HOST', '0.0.0.0')  # Bind to all interfaces
     debug = os.getenv('FLASK_DEBUG', 'False').lower() == 'true'
     
-    app.run(host=host, port=port, debug=debug)
+    print(f"Starting Flask server on {host}:{port}")
+    app.run(host=host, port=port, debug=debug, threaded=True)

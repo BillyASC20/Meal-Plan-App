@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Detection Test</title>
+    <style>
+        body { font-family: Arial; max-width: 800px; margin: 50px auto; padding: 20px; }
+        button { padding: 10px 20px; margin: 10px; font-size: 16px; cursor: pointer; }
+        #results { margin-top: 20px; padding: 20px; background: #f0f0f0; border-radius: 8px; }
+        .item { padding: 8px; margin: 4px; background: white; border-radius: 4px; }
+        #image-preview { max-width: 400px; margin: 20px 0; }
+        .success { color: green; }
+        .error { color: red; }
+    </style>
+</head>
+<body>
+    <h1>🧪 Detection Test Page</h1>
+    
+    <div>
+        <input type="file" id="fileInput" accept="image/*">
+        <button onclick="testDetection()">🔍 Test Detection</button>
+        <button onclick="testSample()">📦 Test Sample Endpoint</button>
+    </div>
+    
+    <img id="image-preview" style="display:none;">
+    
+    <div id="results"></div>
+
+    <script>
+        const BASE_URL = 'http://localhost:5000';
+        
+        document.getElementById('fileInput').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(event) {
+                    const img = document.getElementById('image-preview');
+                    img.src = event.target.result;
+                    img.style.display = 'block';
+                    window.currentImage = event.target.result;
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+        
+        async function testSample() {
+            const results = document.getElementById('results');
+            results.innerHTML = '<p>Testing sample endpoint...</p>';
+            
+            try {
+                const response = await fetch(`${BASE_URL}/debug/sample-detections`);
+                const data = await response.json();
+                
+                results.innerHTML = `
+                    <h3 class="success">✅ Sample Endpoint Working!</h3>
+                    <pre>${JSON.stringify(data, null, 2)}</pre>
+                `;
+            } catch (error) {
+                results.innerHTML = `<p class="error">❌ Error: ${error.message}</p>`;
+            }
+        }
+        
+        async function testDetection() {
+            const results = document.getElementById('results');
+            
+            if (!window.currentImage) {
+                results.innerHTML = '<p class="error">Please select an image first!</p>';
+                return;
+            }
+            
+            results.innerHTML = '<p>🔍 Detecting ingredients...</p>';
+            
+            try {
+                console.log('Sending detection request...');
+                console.log('Image data length:', window.currentImage.length);
+                
+                const response = await fetch(`${BASE_URL}/detect-ingredients`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ image: window.currentImage })
+                });
+                
+                console.log('Response status:', response.status);
+                const data = await response.json();
+                console.log('Response data:', data);
+                
+                if (data.status === 'success') {
+                    const preds = data.data.predictions || [];
+                    const ings = data.data.ingredients || [];
+                    
+                    if (preds.length === 0) {
+                        results.innerHTML = `
+                            <h3 class="error">⚠️ Nothing Detected</h3>
+                            <p>The model didn't detect any items in the image.</p>
+                            <p>Message: ${data.data.message || 'none'}</p>
+                        `;
+                    } else {
+                        let html = `<h3 class="success">✅ Detected ${preds.length} items!</h3>`;
+                        html += '<div>';
+                        preds.forEach(pred => {
+                            html += `<div class="item">
+                                ${pred.name} - ${(pred.confidence * 100).toFixed(1)}%
+                            </div>`;
+                        });
+                        html += '</div>';
+                        html += `<p><strong>Ingredients list:</strong> ${ings.join(', ')}</p>`;
+                        results.innerHTML = html;
+                    }
+                } else {
+                    results.innerHTML = `<p class="error">❌ Error: ${data.message}</p>`;
+                }
+            } catch (error) {
+                results.innerHTML = `<p class="error">❌ Error: ${error.message}</p>`;
+                console.error('Detection error:', error);
+            }
+        }
+    </script>
+</body>
+</html>

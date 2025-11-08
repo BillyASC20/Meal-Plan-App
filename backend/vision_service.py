@@ -5,7 +5,7 @@ from pathlib import Path
 
 # Try to import heavy deps; if they fail, we'll run in "no-model" fallback mode.
 try:
-    import torch
+    from ultralytics import YOLO
     from PIL import Image
     import numpy as np
     TORCH_AVAILABLE = True
@@ -46,30 +46,40 @@ class VisionService:
         }
 
         if not TORCH_AVAILABLE:
-            print("[vision_service] torch/PIL/numpy not available. Running in fallback mode.")
+            print("[vision_service] ultralytics/PIL/numpy not available. Running in fallback mode.")
             return
 
         try:
             # Prefer a custom model in backend/models/ingredients.pt if present
+            # Or use the trained model from runs/detect
             repo_dir = Path(__file__).resolve().parent
+            
+            # Try trained model first, then fall back to ingredients.pt
+            trained_model = repo_dir / 'runs' / 'detect' / 'food_detector2' / 'weights' / 'best.pt'
             default_model = repo_dir / 'models' / 'ingredients.pt'
-            model_path = os.getenv('YOLO_MODEL_PATH') or str(default_model)
-
-            if not os.path.exists(model_path):
-                # fall back to ultralytics hub model (may be slower)
+            
+            if trained_model.exists():
+                model_path = str(trained_model)
+            elif default_model.exists():
+                model_path = str(default_model)
+            else:
+                model_path = os.getenv('YOLO_MODEL_PATH')
+            
+            if not model_path or not os.path.exists(model_path):
                 print(f"[vision_service] Model not found at {model_path}.")
                 print("[vision_service] No model loaded — fallback detections will be used.")
                 self.model = None
                 self.is_ready = False
                 return
 
-            # Try to load custom model
+            # Load YOLOv8 model using ultralytics
             try:
-                self.model = torch.hub.load('ultralytics/yolov5', 'custom', path=model_path, force_reload=False, _verbose=False)
-                # names mapping (model.names exists on ultralytics models)
-                self.names = getattr(self.model, 'names', {}) or {}
+                self.model = YOLO(model_path)
+                # names mapping
+                self.names = self.model.names or {}
                 self.is_ready = True
-                print(f"[vision_service] Model loaded successfully from {model_path}. Can detect {len(self.names)} classes.")
+                print(f"[vision_service] YOLOv8 model loaded successfully from {model_path}")
+                print(f"[vision_service] Can detect {len(self.names)} classes.")
             except Exception as load_err:
                 print(f"[vision_service] Failed to load model from {model_path}: {load_err}")
                 print("[vision_service] Fallback detections will be used.")
@@ -104,7 +114,7 @@ class VisionService:
                 tiles.append(tile)
         return tiles
 
-    def detect_with_confidence(self, base64_image, topk: int = 8):
+    def detect_with_confidence(self, base64_image, topk: int = 25):
         """Return list of {name, confidence} detected from base64 image.
 
         If model isn't available, returns empty list.
@@ -114,65 +124,57 @@ class VisionService:
 
         try:
             pil_image = self._decode_image(base64_image)
-            img_array = np.array(pil_image)
 
+            # YOLOv8 detection - start with VERY low confidence for grocery photos
+            results = self.model(pil_image, conf=0.01, verbose=False)  # Changed from 0.15 to 0.01
+            
             candidates = []
-
-            def add_from_results(res):
-                # ultralytics v5/v8 result compatibility handling
-                boxes = getattr(res, 'boxes', None)
+            
+            # Extract detections from results with bounding boxes
+            for result in results:
+                boxes = result.boxes
                 if boxes is not None and len(boxes) > 0:
                     for box in boxes:
                         try:
-                            class_id = int(box.cls[0])
+                            class_id = int(box.cls[0].item())
                             class_name = self.names.get(class_id, str(class_id))
-                            confidence = float(box.conf[0])
-                            candidates.append((class_name, confidence))
-                        except Exception:
+                            confidence = float(box.conf[0].item())
+                            
+                            # Get bounding box coordinates (xyxy format: x1, y1, x2, y2)
+                            bbox = box.xyxy[0].cpu().numpy().tolist()
+                            
+                            candidates.append({
+                                "name": class_name,
+                                "confidence": confidence,
+                                "bbox": {
+                                    "x1": float(bbox[0]),
+                                    "y1": float(bbox[1]),
+                                    "x2": float(bbox[2]),
+                                    "y2": float(bbox[3])
+                                }
+                            })
+                        except Exception as e:
+                            print(f"[vision_service] Error processing box: {e}")
                             continue
 
-                probs = getattr(res, 'probs', None)
-                if probs is not None:
-                    try:
-                        # topk from probs tensor
-                        vals, idxs = torch.topk(probs.data, k=min(topk, probs.data.shape[-1]))
-                        for score, class_id in zip(vals.tolist(), idxs.tolist()):
-                            class_name = self.names.get(int(class_id), str(int(class_id)))
-                            candidates.append((class_name, float(score)))
-                    except Exception:
-                        pass
-
-            # run on full image
-            results = self.model(img_array, conf=0.001, verbose=False)
-            for res in results:
-                add_from_results(res)
-
-            # tile the image for classification-style models to harvest more items
-            try:
-                tiles = self._split_tiles(pil_image, grid_size=(3, 3))
-                for tile in tiles:
-                    tile_arr = np.array(tile)
-                    tile_res = self.model(tile_arr, conf=0.001, verbose=False)
-                    for tr in tile_res:
-                        add_from_results(tr)
-            except Exception:
-                # non-fatal
-                pass
-
-            # sort by confidence and unique by name
-            candidates.sort(key=lambda x: x[1], reverse=True)
+            # Sort by confidence and remove duplicates
+            candidates.sort(key=lambda x: x["confidence"], reverse=True)
             seen = set()
             out = []
-            for name, conf in candidates:
-                if name not in seen:
-                    seen.add(name)
-                    out.append({"name": name, "confidence": conf})
+            for item in candidates:
+                if item["name"] not in seen:
+                    seen.add(item["name"])
+                    out.append(item)
                 if len(out) >= topk:
                     break
 
+            print(f"[vision_service] Detected {len(out)} items: {[item['name'] + ' (' + str(round(item['confidence'], 2)) + ')' for item in out[:5]]}")
             return out
+            
         except Exception as e:
             print(f"[vision_service] detect error: {e}")
+            import traceback
+            traceback.print_exc()
             return []
 
     def detect_multiple_items(self, base64_image, top_n_per_tile=2, grid_size=(3, 3), conf_threshold=0.1):

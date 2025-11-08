@@ -24,7 +24,7 @@ export interface DetectedResult {
   message?: string
 }
 
-const BASE_URL = 'http://localhost:5000'
+const BASE_URL = 'http://localhost:5001'  // Changed from 5000 to 5001
 
 async function handleResponse(res: Response) {
   let data: any
