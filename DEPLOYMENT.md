@@ -1,164 +1,156 @@
-# 🚀 Deployment Guide - Meal Plan App
+# Deployment Guide for Meal Plan App Backend
 
-## Quick Deploy (FREE)
+## 🚀 Quick Deploy Options
 
-### Frontend → Vercel (5 mins)
+Your backend is ready to deploy on multiple platforms. Choose one:
 
-1. **Push to GitHub** (if not already)
+---
+
+## Option 1: Railway (Recommended - Easiest)
+
+1. **Push to GitHub:**
    ```bash
-   cd /Users/zc/Desktop/Meal-Plan-App
    git add .
    git commit -m "Ready for deployment"
-   git push
+   git push origin main
    ```
 
-2. **Deploy to Vercel**
-   - Go to https://vercel.com
-   - Sign in with GitHub
-   - Click "New Project"
-   - Import `Meal-Plan-App` repo
-   - Select `frontend` folder as root directory
-   - Click "Deploy"
-   - Done! Get your URL: `https://meal-plan-app-xxx.vercel.app`
+2. **Deploy on Railway:**
+   - Go to [railway.app](https://railway.app)
+   - Click "New Project" → "Deploy from GitHub repo"
+   - Select your `Meal-Plan-App` repository
+   - Railway will auto-detect the Dockerfile
+   - Add environment variable: `OPENAI_API_KEY=your_key_here`
+   - Deploy!
+
+3. **Get your URL:**
+   - Railway will give you a URL like `https://meal-plan-backend.railway.app`
+   - Update your frontend `api.ts` with this URL
+
+**Pros:** Free tier, automatic HTTPS, easy setup
+**Build time:** ~10-15 minutes (downloads models during build)
 
 ---
 
-### Backend → Render (10 mins)
+## Option 2: Render
 
-1. **Go to Render**
-   - Visit https://render.com
-   - Sign up/Login with GitHub
+1. **Push to GitHub** (same as above)
 
-2. **Create New Web Service**
-   - Click "New +" → "Web Service"
-   - Connect GitHub → Select `Meal-Plan-App` repo
-   - Name: `meal-plan-backend`
-   - Root Directory: `backend`
-   - Environment: `Python 3`
-   - Build Command: `pip install -r requirements.txt`
-   - Start Command: `gunicorn app:app --bind 0.0.0.0:$PORT`
+2. **Deploy on Render:**
+   - Go to [render.com](https://render.com)
+   - Click "New" → "Blueprint"
+   - Connect your GitHub repo
+   - Render will use `render.yaml` config
+   - Add environment variable: `OPENAI_API_KEY`
+   - Deploy!
 
-3. **Add Environment Variables**
-   - Click "Environment" tab
-   - Add: `OPENAI_API_KEY` = `your_key_here`
-   - Add: `PORT` = `10000` (Render default)
-   - Add: `HOST` = `0.0.0.0`
-
-4. **Deploy!**
-   - Click "Create Web Service"
-   - Wait 5-10 minutes (installing PyTorch is slow)
-   - Get your backend URL: `https://meal-plan-backend.onrender.com`
+**Pros:** Free tier available, good for production
+**Build time:** ~10-15 minutes
 
 ---
 
-### Connect Frontend to Backend
+## Option 3: Docker (Self-hosted / Any platform)
 
-1. **Update Frontend API URL**
-   - In your Vercel dashboard
-   - Settings → Environment Variables
-   - Add: `VITE_API_URL` = `https://meal-plan-backend.onrender.com`
-   - Redeploy
-
-2. **Or edit code directly:**
-   ```typescript
-   // frontend/src/pages/CameraPage.tsx
-   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001';
-   
-   fetch(`${API_URL}/detect-ingredients`, {
-     // ...
-   })
+1. **Build the image:**
+   ```bash
+   docker build -t meal-plan-backend .
    ```
 
----
+2. **Run locally:**
+   ```bash
+   docker run -p 5001:5001 -e OPENAI_API_KEY=your_key_here meal-plan-backend
+   ```
 
-## ⚠️ Free Tier Limitations
-
-**Render Free:**
-- ❌ Spins down after 15 mins of inactivity
-- ❌ Cold start = 30-60 seconds
-- ❌ Limited to 512MB RAM (might be tight for YOLOv8)
-- ✅ Good enough for demos/presentations
-
-**Solution for Presentation Day:**
-- Upgrade to Render $7/month for 1 month
-- Or use Railway $5/month
-- Cancel after you present
+3. **Deploy to any Docker host:**
+   - DigitalOcean App Platform
+   - AWS ECS
+   - Google Cloud Run
+   - Azure Container Apps
 
 ---
 
-## 🚂 Alternative: Railway (Recommended for ML)
+## Frontend Deployment (Vercel)
 
-**Better for your app because:**
-- Faster cold starts
-- More RAM (1GB free tier)
-- Better for ML models
-- Easier setup
+Already configured in `frontend/vercel.json`:
 
-**Deploy to Railway:**
+1. **Deploy frontend:**
+   ```bash
+   cd frontend
+   vercel
+   ```
+
+2. **Update API URL:**
+   - After backend is deployed, update `frontend/src/components/api.ts`
+   - Change `BASE_URL` to your backend URL
+   - Redeploy: `vercel --prod`
+
+---
+
+## Environment Variables Needed
+
+### Backend:
+- `OPENAI_API_KEY` - Your OpenAI API key (required)
+- `PORT` - Port number (default: 5001)
+- `FLASK_DEBUG` - Set to `false` for production
+
+### Frontend:
+- No environment variables needed (API URL is in code)
+
+---
+
+## Model Files
+
+The Dockerfile automatically downloads:
+- Grounding DINO model (~662MB)
+- SAM base model (~375MB)
+
+**Total deployment size:** ~2.5GB
+**First build time:** 10-15 minutes
+**Subsequent builds:** 2-3 minutes (cached)
+
+---
+
+## Testing Deployment
+
+After deployment, test your backend:
+
 ```bash
-# Install CLI
-brew install railway
-
-# Login
-railway login
-
-# Deploy
-cd /Users/zc/Desktop/Meal-Plan-App
-railway init
-railway up
-
-# Add environment variables
-railway variables set OPENAI_API_KEY=your_key_here
+curl https://your-backend-url.com/health
 ```
 
-Done! Railway gives you URLs for both frontend and backend.
+Should return: `{"status": "healthy", "service": "ready"}`
 
 ---
 
-## 📱 Share Your App
+## Cost Estimates
 
-**After deployment:**
-1. Frontend: `https://meal-plan-app.vercel.app`
-2. Backend: `https://meal-plan-backend.onrender.com`
-3. Share frontend URL with anyone!
-4. They can upload photos and get recipes!
+- **Railway:** Free tier (500hrs/month, sleeps after inactivity)
+- **Render:** Free tier (750hrs/month, spins down after 15min)
+- **Vercel (frontend):** Free tier (unlimited)
 
----
-
-## 🎓 For Your Senior Project Presentation
-
-**Before Demo Day:**
-1. Test everything on deployed version
-2. Have backup screenshots/video in case it's slow
-3. Consider upgrading to paid tier ($5-7) for 1 month
-4. Monitor usage in dashboard
-5. Have localhost version as backup
-
-**Cost for 1 month presentation:**
-- Vercel: FREE
-- Render: $7/month or Railway: $5/month
-- Total: ~$5-7 for professional deployment
-
-Worth it for a senior project! Cancel after you present.
+**Recommended for production:** Railway Hobby ($5/mo) or Render Starter ($7/mo)
 
 ---
 
-## 🔥 Pro Tips
+## Quick Commands
 
-1. **Use smaller model for free tier:**
-   - YOLOv8n (nano) instead of YOLOv8m
-   - Faster and uses less RAM
+```bash
+# Test Docker locally
+docker build -t meal-plan-backend .
+docker run -p 5001:5001 -e OPENAI_API_KEY=$OPENAI_API_KEY meal-plan-backend
 
-2. **Keep backend warm:**
-   - Use a free uptime monitor (UptimeRobot)
-   - Pings your backend every 5 minutes
-   - Prevents cold starts
+# Deploy to Railway (after connecting repo)
+railway up
 
-3. **Optimize for demo:**
-   - Pre-load some example images
-   - Have cURL commands ready to test backend
-   - Test from different devices before presentation
+# Deploy frontend to Vercel
+cd frontend && vercel --prod
+```
 
 ---
 
-**Need help deploying? Let me know which platform you choose!**
+## Notes
+
+- ⏱️ **Cold starts:** First request may take 10-30s (models loading)
+- 💾 **Memory usage:** ~2GB RAM needed
+- 🔒 **CORS:** Currently allows all origins (update in production)
+- 📦 **Models:** Baked into Docker image (no runtime downloads)

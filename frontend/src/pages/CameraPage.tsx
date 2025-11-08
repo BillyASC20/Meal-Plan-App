@@ -38,6 +38,12 @@ export const CameraPage = () => {
       const result = await api.detectIngredients(dataUrl)
       setPredictions(result.predictions || [])
       const allNames = (result.predictions || []).map(p => p.name)
+      
+      // Update to show image with bounding boxes
+      if (result.image_with_boxes) {
+        setUploadedImage(result.image_with_boxes)
+      }
+      
       setDetectedItems(allNames)
       if (allNames.length) {
         sessionStorage.setItem('detectedIngredients', JSON.stringify(allNames))
@@ -54,8 +60,14 @@ export const CameraPage = () => {
     setIsDetecting(true)
     try {
       const result = await api.detectIngredients(uploadedImage)
+      
       setPredictions(result.predictions || [])
       const allNames = (result.predictions || []).map(p => p.name)
+      
+      if (result.image_with_boxes) {
+        setUploadedImage(result.image_with_boxes)
+      }
+      
       if (allNames.length > 0) {
         setDetectedItems(allNames)
         sessionStorage.setItem('detectedIngredients', JSON.stringify(allNames))

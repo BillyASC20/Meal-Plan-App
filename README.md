@@ -1,41 +1,57 @@
 # 🍳 Meal Plan App
 
-An AI-powered meal planning application that detects ingredients from photos using **YOLOv8** and generates personalized recipes using **OpenAI GPT**. Built with Flask (Python) backend and React + TypeScript frontend with a premium gold luxury design.
+An AI-powered meal planning application that detects ingredients from photos using **Grounded-SAM computer vision** and generates personalized recipes using **OpenAI GPT**. Built with Flask (Python) backend and React + TypeScript frontend with a premium gold luxury design.
 
 ## ✨ Features
 
 - 📸 **Photo Upload**: Take or upload photos of your ingredients
-- 🤖 **AI Ingredient Detection**: Free, self-hosted YOLOv8 model (trainable on your own data!)
-- 🍽️ **Recipe Generation**: OpenAI GPT-3.5-turbo generates custom recipes
+- 🤖 **AI Ingredient Detection**: Grounded-SAM (Grounding DINO + Segment Anything)
+- 🍽️ **Recipe Generation**: OpenAI GPT generates custom recipes based on detected ingredients
 - 💎 **Premium UI**: Glassmorphic design with gold accents and smooth animations
-- 🎓 **Custom Training**: Train your own ingredient detector with your images (100% free!)
+-  **Zero-Shot Detection**: Detects ANY food item without training!
+
+## �️ Tech Stack
+
+- **Backend**: Flask (Python), Grounded-SAM, OpenAI API
+- **Frontend**: React, TypeScript, Vite, Framer Motion
+- **Deployment**: Docker, Railway/Render (backend), Vercel (frontend)
 
 ## 📋 Project Structure
 
 ```
 Meal-Plan-App/
-├── backend/                  # Flask API Server
-│   ├── app.py               # Main Flask application
-│   ├── openai_service.py    # OpenAI integration
-│   ├── recipe_generator.py  # Recipe generation logic
-│   └── requirements.txt     # Python dependencies
-├── frontend/                # React + TypeScript App
+├── backend/                     # Flask API Server
+│   ├── app.py                  # Main Flask application
+│   ├── grounded_sam_service.py # Computer vision service
+│   ├── openai_service.py       # OpenAI integration
+│   ├── recipe_generator.py     # Recipe generation logic
+│   ├── requirements.txt        # Python dependencies
+│   └── models/grounded_sam/    # AI model files
+├── frontend/                    # React + TypeScript App
 │   ├── src/
-│   │   ├── App.tsx         # Main React component
-│   │   ├── App.css         # Styling
-│   │   └── main.tsx        # Entry point
-│   ├── vite.config.ts      # Vite configuration
-│   └── package.json        # Node dependencies
-└── README.md
+│   │   ├── pages/             # Page components
+│   │   ├── components/        # Reusable components
+│   │   └── App.tsx            # Main app
+│   └── package.json
+├── Dockerfile                   # Backend deployment config
+├── start.sh                     # Local startup script
+└── deploy.sh                    # Deployment helper
 ```
 
-## 🚀 Getting Started
+## 🚀 Quick Start (Local Development)
+
+**⚡ Want to get started in 3 minutes?** See **[QUICKSTART.md](QUICKSTART.md)** for the fastest setup!
+
+**Or use the quick start script:**
+```bash
+./quickstart.sh  # Automated setup and startup
+```
 
 ### Prerequisites
 
 - Python 3.8+
 - Node.js 18+
-- OpenAI API Key
+- OpenAI API Key ([Get one here](https://platform.openai.com/api-keys))
 
 ### Backend Setup
 
@@ -179,26 +195,160 @@ Generates recipes based on detected/provided ingredients using OpenAI.
 }
 ```
 
-## 🎓 Development Notes
+## 🚀 Deployment
 
-This is a senior project with planned features:
+### Test First
 
-- **Current:** Using mock ingredient detection
-- **Future:** Integrate Ultralytics for image-based ingredient detection
-- **Deployment:** Ready for platforms like Render, Heroku, or Vercel
+```bash
+./check.sh
+./test-docker.sh
+```
+
+If `test-docker.sh` passes, deployment will work.
+
+---
+
+### Quick Deploy
+
+```bash
+./deploy.sh
+```
+
+### Railway (Recommended)
+
+1. Push to GitHub
+2. Connect repo on [railway.app](https://railway.app)
+3. Add environment variable: `OPENAI_API_KEY`
+4. Deploy
+
+### Render
+
+1. Push to GitHub
+2. Create new Blueprint on [render.com](https://render.com)
+3. Connect repo (uses `render.yaml`)
+4. Add environment variable: `OPENAI_API_KEY`
+
+### Docker (Self-host)
+
+```bash
+docker build -t meal-plan-backend .
+docker run -p 5001:5001 -e OPENAI_API_KEY=key meal-plan-backend
+```
+
+**📖 Full guide:** [DEPLOYMENT.md](DEPLOYMENT.md)
+
+---
 
 ## 📝 Scripts
 
+**Start app:**
+```bash
+./start.sh
+```
+
 **Backend:**
 ```bash
-python app.py          # Run Flask server
+cd backend
+python app.py
 ```
 
 **Frontend:**
 ```bash
-npm run dev           # Start development server
-npm run build         # Build for production
-npm run preview       # Preview production build
+cd frontend
+npm run dev
+npm run build
+```
+
+## 🐛 Troubleshooting
+
+### Backend won't start
+
+1. **Check if `.env` file exists:**
+   ```bash
+   ls backend/.env
+   ```
+   If not found, copy from example:
+   ```bash
+   cp backend/.env.example backend/.env
+   ```
+   Then edit `backend/.env` and add your OpenAI API key.
+
+2. **Check Python dependencies:**
+   ```bash
+   cd backend
+   pip install -r requirements.txt
+   ```
+
+3. **Check if port 5001 is already in use:**
+   ```bash
+   lsof -ti :5001
+   # Kill existing process:
+   lsof -ti :5001 | xargs kill -9
+   ```
+
+4. **View backend logs:**
+   ```bash
+   tail -f /tmp/meal-plan-backend.log
+   ```
+
+### Frontend won't start
+
+1. **Check Node dependencies:**
+   ```bash
+   cd frontend
+   npm install
+   ```
+
+2. **Check if port 3000 is already in use:**
+   ```bash
+   lsof -ti :3000
+   # Kill existing process:
+   lsof -ti :3000 | xargs kill -9
+   ```
+
+3. **View frontend logs:**
+   ```bash
+   tail -f /tmp/meal-plan-frontend.log
+   ```
+
+### Port mismatch issues
+
+Ensure these match:
+- `backend/app.py` default port: **5001**
+- `frontend/vite.config.ts` proxy target: **http://localhost:5001**
+- `frontend/src/components/api.ts` BASE_URL: **http://localhost:5001**
+
+### Models taking too long to load
+
+The Grounded-SAM models are large and can take 10-20 seconds to load on CPU. Wait for:
+```
+[grounded_sam_service] 🎉 Service ready! Detecting 52 food categories
+```
+
+### OpenAI API errors
+
+1. Check your API key is set in `backend/.env`
+2. Check your OpenAI account has credits: https://platform.openai.com/account/usage
+3. Check API endpoint in logs for specific error messages
+
+## 📝 Scripts
+
+**Start app:**
+```bash
+./start.sh
+```
+
+**Backend:**
+```bash
+cd backend
+python app.py
+```
+
+**Frontend:**
+```bash
+cd frontend
+npm run dev
+npm run build
 ```
 
 ## 🤝 Contributing

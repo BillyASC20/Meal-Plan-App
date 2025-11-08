@@ -325,3 +325,46 @@
     font-size: 1.5rem;
   }
 }
+
+.recipes-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.streaming-container {
+  margin: 24px 0;
+}
+
+.streaming-text {
+  font-family: 'Courier New', monospace;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.8);
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  line-height: 1.6;
+  margin: 0;
+  padding: 20px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.streaming-cursor {
+  display: inline-block;
+  color: #4ade80;
+  font-weight: bold;
+  animation: blink 1s infinite;
+  margin-left: 4px;
+}
+
+@keyframes blink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}
+
+.no-recipes {
+  text-align: center;
+  padding: 60px 20px;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 18px;
+}
