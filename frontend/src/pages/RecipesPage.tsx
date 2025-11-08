@@ -4,6 +4,7 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import { GlassCard } from '../components/GlassCard'
 import { GlassButton } from '../components/GlassButton'
 import './RecipesPage.css'
+import { api } from '../components/api'
 
 interface Recipe {
   title: string
@@ -23,25 +24,23 @@ export const RecipesPage = () => {
   useEffect(() => {
     const fetchRecipes = async () => {
       try {
-        // Get ingredients from navigation state
-        const ingredientsToUse = location.state?.ingredients || ['chicken', 'rice', 'vegetables']
+        // Get ingredients from navigation state or sessionStorage
+        const fromState = (location.state as any)?.ingredients as string[] | undefined
+        const fromStorage = sessionStorage.getItem('detectedIngredients')
+        const parsed = fromStorage ? (JSON.parse(fromStorage) as string[]) : undefined
+        const ingredientsToUse = (fromState && fromState.length > 0)
+          ? fromState
+          : (parsed && parsed.length > 0)
+            ? parsed
+            : []
         setIngredients(ingredientsToUse)
         
-        // Call real backend with detected ingredients (port 5001)
-        const response = await fetch('http://localhost:5001/generate-recipes', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            ingredients: ingredientsToUse
-          })
-        })
-        
-        const data = await response.json()
-        
-        if (data.status === 'success' && data.data?.recipes) {
-          setRecipes(data.data.recipes)
+        // If nothing detected, don't call backend
+        if (ingredientsToUse.length > 0) {
+          const result = await api.generateRecipes(ingredientsToUse)
+          setRecipes(result.recipes || [])
+        } else {
+          setRecipes([])
         }
       } catch (error) {
         console.error('Failed to fetch recipes:', error)

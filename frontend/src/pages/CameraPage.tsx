@@ -4,12 +4,14 @@ import { useNavigate } from 'react-router-dom'
 import { GlassCard } from '../components/GlassCard'
 import { GlassButton } from '../components/GlassButton'
 import './CameraPage.css'
+import { api } from '../components/api'
 
 export const CameraPage = () => {
   const navigate = useNavigate()
   const [isDetecting, setIsDetecting] = useState(false)
   const [detectedItems, setDetectedItems] = useState<string[]>([])
   const [uploadedImage, setUploadedImage] = useState<string | null>(null)
+  const [predictions, setPredictions] = useState<{name: string, confidence: number}[]>([])
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -27,36 +29,42 @@ export const CameraPage = () => {
     fileInputRef.current?.click()
   }
 
+  const loadSampleHero = async () => {
+    try {
+      setIsDetecting(true)
+      const dataUrl = await api.getHeroImageDataURL()
+      setUploadedImage(dataUrl)
+      // auto-run detection after loading
+      const result = await api.detectIngredients(dataUrl)
+      setPredictions(result.predictions || [])
+      const allNames = (result.predictions || []).map(p => p.name)
+      setDetectedItems(allNames)
+      if (allNames.length) {
+        sessionStorage.setItem('detectedIngredients', JSON.stringify(allNames))
+      }
+    } catch (e) {
+      console.error('Failed to load hero sample', e)
+    } finally {
+      setIsDetecting(false)
+    }
+  }
+
   const detectIngredients = async () => {
     if (!uploadedImage) return
-    
     setIsDetecting(true)
-    
     try {
-      // Call real backend with YOLOv8 detection (port 5001 to avoid AirPlay conflict)
-      const response = await fetch('http://localhost:5001/detect-ingredients', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          image: uploadedImage // Already in base64 format
-        })
-      })
-      
-      const data = await response.json()
-      
-      if (data.status === 'success' && data.data?.ingredients) {
-        setDetectedItems(data.data.ingredients)
+      const result = await api.detectIngredients(uploadedImage)
+      setPredictions(result.predictions || [])
+      const allNames = (result.predictions || []).map(p => p.name)
+      if (allNames.length > 0) {
+        setDetectedItems(allNames)
+        sessionStorage.setItem('detectedIngredients', JSON.stringify(allNames))
       } else {
-        console.error('Detection failed:', data.message)
-        // Fallback to mock data
-        setDetectedItems(['chicken', 'broccoli', 'rice', 'garlic'])
+        setDetectedItems([]) // empty list -> UI will show nothing detected message
       }
-    } catch (error) {
-      console.error('Error detecting ingredients:', error)
-      // Fallback to mock data if backend is down
-      setDetectedItems(['chicken', 'broccoli', 'rice', 'garlic'])
+    } catch (err) {
+      console.error('Error detecting ingredients:', err)
+      setDetectedItems([])
     } finally {
       setIsDetecting(false)
     }
@@ -64,7 +72,14 @@ export const CameraPage = () => {
 
   const generateRecipes = async () => {
     // Navigate to results page with detected ingredients
-    navigate('/recipes', { state: { ingredients: detectedItems } })
+    if (detectedItems.length > 0) {
+      navigate('/recipes', { state: { ingredients: detectedItems } })
+    } else {
+      // try to use persisted ingredients if available
+      const saved = sessionStorage.getItem('detectedIngredients')
+      const parsed = saved ? (JSON.parse(saved) as string[]) : []
+      navigate('/recipes', { state: { ingredients: parsed } })
+    }
   }
 
   return (
@@ -109,6 +124,11 @@ export const CameraPage = () => {
                   <GlassButton onClick={triggerFileInput} size="large">
                     📷 Take Photo / Upload
                   </GlassButton>
+                  <div style={{ display: 'inline-block', marginLeft: '12px' }}>
+                    <GlassButton onClick={loadSampleHero} variant="secondary" size="medium">
+                      Use Sample Image
+                    </GlassButton>
+                  </div>
                 </div>
               </motion.div>
             ) : (
@@ -175,7 +195,13 @@ export const CameraPage = () => {
                         {item.charAt(0).toUpperCase()}
                       </div>
                     </div>
-                    <span className="item-name">{item}</span>
+                    <span className="item-name">
+                      {item}
+                      {(() => {
+                        const p = predictions.find(pr => pr.name === item)
+                        return p ? `  ${(p.confidence*100).toFixed(1)}%` : ''
+                      })()}
+                    </span>
                     <svg className="check-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                       <path d="M20 6L9 17L4 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                     </svg>
@@ -197,6 +223,29 @@ export const CameraPage = () => {
                   size="large"
                 >
                   Generate Recipes →
+                </GlassButton>
+              </div>
+            </GlassCard>
+          </motion.div>
+        )}
+        {uploadedImage && !isDetecting && detectedItems.length === 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="detected-section"
+          >
+            <GlassCard>
+              <h2 className="detected-title">Nothing Detected</h2>
+              <p style={{ marginTop: '8px', opacity: 0.8 }}>Try a clearer photo or different angle. Make sure the food is well lit.</p>
+              <div className="action-buttons" style={{ marginTop: '16px' }}>
+                <GlassButton
+                  variant="secondary"
+                  onClick={() => {
+                    setDetectedItems([])
+                    setUploadedImage(null)
+                  }}
+                >
+                  Upload New Photo
                 </GlassButton>
               </div>
             </GlassCard>

@@ -1,6 +1,6 @@
 import random
-from openai_service import OpenAIService
-from vision_service import vision_service
+from .openai_service import OpenAIService
+from .vision_service import vision_service
 
 class RecipeGenerator:
     def __init__(self, openai_service=None):

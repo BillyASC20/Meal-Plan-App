@@ -1,46 +1,30 @@
 import base64
 import io
 import os
-from PIL import Image
-from ultralytics import YOLO
-import cv2
-import numpy as np
-import torch
+from pathlib import Path
 
-# Fix PyTorch 2.6 weights_only security issue for YOLO models
+# Try to import heavy deps; if they fail, we'll run in "no-model" fallback mode.
 try:
-    from ultralytics.nn.tasks import DetectionModel
-    torch.serialization.add_safe_globals([DetectionModel])
-except (AttributeError, ImportError):
-    # Older PyTorch version or unable to import
-    pass
+    import torch
+    from PIL import Image
+    import numpy as np
+    TORCH_AVAILABLE = True
+except Exception:
+    TORCH_AVAILABLE = False
+
 
 class VisionService:
+    """Lightweight vision service wrapper.
+
+    - If torch/ultralytics model is available, loads the model and performs
+      inference with tiling to harvest multiple detections.
+    - Otherwise returns empty lists (safe fallback) so the server can run.
+    """
+
     def __init__(self):
-        """
-        Initialize YOLOv8 model.
-        
-        Options:
-        1. Use pre-trained model (yolov8n.pt) - detects common objects
-        2. Use custom trained model - put your trained weights in backend/models/
-        """
-        # Check for custom trained model first
-        custom_model = 'models/ingredients.pt'
-        if os.path.exists(custom_model):
-            print(f"🎯 Loading custom trained model: {custom_model}")
-            self.model = YOLO(custom_model)
-        else:
-            # Pre-trained model is TRASH for ingredients - only detects generic objects
-            # This is just a placeholder until you train your own model
-            model_path = os.getenv('YOLO_MODEL_PATH', 'yolov8n.pt')
-            print(f"⚠️  WARNING: Using generic pre-trained model (NOT optimized for food)")
-            print(f"    This will detect containers/objects, not ingredients!")
-            print(f"    Train your own model for real ingredient detection!")
-            print(f"    See TRAINING_GUIDE.md")
-            self.model = YOLO(model_path)
-        
-        # Common food items that YOLO can detect
-        # You'll expand this when you train your own model
+        self.is_ready = False
+        self.model = None
+        self.names = {}
         self.food_mappings = {
             'apple': 'apple',
             'banana': 'banana',
@@ -56,114 +40,157 @@ class VisionService:
             'wine glass': 'wine',
             'cup': 'beverage',
             'bowl': 'bowl',
-            'knife': None,  # Ignore utensils
+            'knife': None,
             'fork': None,
             'spoon': None,
         }
-    
-    def detect_ingredients(self, base64_image):
-        """
-        Detect ingredients from base64 encoded image.
-        
-        Args:
-            base64_image: Base64 encoded image string (with or without data URL prefix)
-        
-        Returns:
-            List of detected ingredient names
-        """
-        try:
-            # Remove data URL prefix if present
-            if ',' in base64_image:
-                base64_image = base64_image.split(',')[1]
-            
-            # Decode base64 to image
-            image_data = base64.b64decode(base64_image)
-            image = Image.open(io.BytesIO(image_data))
-            
-            # Convert PIL Image to numpy array for YOLO
-            img_array = np.array(image)
-            
-            # Run YOLO inference
-            results = self.model(img_array, conf=0.25)  # 25% confidence threshold
-            
-            # Extract detected classes
-            detected_ingredients = set()
-            
-            for result in results:
-                boxes = result.boxes
-                for box in boxes:
-                    # Get class name
-                    class_id = int(box.cls[0])
-                    class_name = self.model.names[class_id]
-                    confidence = float(box.conf[0])
-                    
-                    print(f"Detected: {class_name} (confidence: {confidence:.2f})")
-                    
-                    # Map to food ingredient if applicable
-                    if class_name in self.food_mappings:
-                        mapped_name = self.food_mappings[class_name]
-                        if mapped_name:  # Not None (ignore utensils)
-                            detected_ingredients.add(mapped_name)
-            
-            # Convert to list and return
-            ingredients = list(detected_ingredients)
-            
-            if not ingredients:
-                print("⚠️  No FOOD items detected. Using fallback ingredients.")
-                print("💡 TIP: Try uploading photos with: apple, banana, orange, broccoli, carrot, pizza, etc.")
-                # Fallback to common ingredients if nothing detected
-                ingredients = ["chicken", "rice", "vegetables"]
-            
-            print(f"✅ Final detected ingredients: {ingredients}")
-            return ingredients
-            
-        except Exception as e:
-            print(f"Error detecting ingredients: {str(e)}")
-            # Fallback on error
-            return ["chicken", "rice", "vegetables"]
-    
-    def train_custom_model(self, dataset_path, epochs=50):
-        """
-        Train a custom YOLOv8 model on your ingredient images.
-        
-        Steps to prepare your training data:
-        1. Collect images of ingredients you want to detect
-        2. Label them using Roboflow or LabelImg (free tools)
-        3. Export in YOLOv8 format
-        4. Put in backend/datasets/ingredients/
-        
-        Dataset structure:
-        datasets/ingredients/
-            ├── data.yaml
-            ├── train/
-            │   ├── images/
-            │   └── labels/
-            └── val/
-                ├── images/
-                └── labels/
-        
-        Args:
-            dataset_path: Path to your prepared dataset
-            epochs: Number of training epochs (50 is good starting point)
-        """
-        print(f"Training custom model on {dataset_path}...")
-        
-        # Train on your custom dataset
-        results = self.model.train(
-            data=dataset_path,
-            epochs=epochs,
-            imgsz=640,
-            batch=16,
-            name='ingredient_detector',
-            patience=10,  # Early stopping
-            save=True,
-            device='cpu'  # Use 'cuda' if you have GPU
-        )
-        
-        print("Training complete! Model saved to runs/detect/ingredient_detector/weights/best.pt")
-        print("Copy the best.pt file to backend/models/ingredients.pt to use it")
-        
-        return results
 
-# Create singleton instance
+        if not TORCH_AVAILABLE:
+            print("[vision_service] torch/PIL/numpy not available. Running in fallback mode.")
+            return
+
+        try:
+            # Prefer a custom model in backend/models/ingredients.pt if present
+            repo_dir = Path(__file__).resolve().parent
+            default_model = repo_dir / 'models' / 'ingredients.pt'
+            model_path = os.getenv('YOLO_MODEL_PATH') or str(default_model)
+
+            if not os.path.exists(model_path):
+                # fall back to ultralytics hub model (may be slower)
+                print(f"[vision_service] Model not found at {model_path}.")
+                print("[vision_service] No model loaded — fallback detections will be used.")
+                self.model = None
+                self.is_ready = False
+                return
+
+            # Try to load custom model
+            try:
+                self.model = torch.hub.load('ultralytics/yolov5', 'custom', path=model_path, force_reload=False, _verbose=False)
+                # names mapping (model.names exists on ultralytics models)
+                self.names = getattr(self.model, 'names', {}) or {}
+                self.is_ready = True
+                print(f"[vision_service] Model loaded successfully from {model_path}. Can detect {len(self.names)} classes.")
+            except Exception as load_err:
+                print(f"[vision_service] Failed to load model from {model_path}: {load_err}")
+                print("[vision_service] Fallback detections will be used.")
+                self.model = None
+                self.is_ready = False
+
+        except Exception as e:
+            print(f"[vision_service] Unexpected error during init: {e}")
+            self.model = None
+            self.is_ready = False
+
+    def _decode_image(self, base64_image):
+        # Accept data URLs or raw base64 strings
+        if ',' in base64_image:
+            base64_image = base64_image.split(',')[1]
+        data = base64.b64decode(base64_image)
+        image = Image.open(io.BytesIO(data)).convert('RGB')
+        return image
+
+    def _split_tiles(self, pil_image, grid_size=(3, 3)):
+        w, h = pil_image.size
+        tiles = []
+        tile_w = max(1, w // grid_size[0])
+        tile_h = max(1, h // grid_size[1])
+        for gy in range(grid_size[1]):
+            for gx in range(grid_size[0]):
+                left = gx * tile_w
+                upper = gy * tile_h
+                right = left + tile_w if (gx < grid_size[0] - 1) else w
+                lower = upper + tile_h if (gy < grid_size[1] - 1) else h
+                tile = pil_image.crop((left, upper, right, lower))
+                tiles.append(tile)
+        return tiles
+
+    def detect_with_confidence(self, base64_image, topk: int = 8):
+        """Return list of {name, confidence} detected from base64 image.
+
+        If model isn't available, returns empty list.
+        """
+        if not self.is_ready or self.model is None:
+            return []
+
+        try:
+            pil_image = self._decode_image(base64_image)
+            img_array = np.array(pil_image)
+
+            candidates = []
+
+            def add_from_results(res):
+                # ultralytics v5/v8 result compatibility handling
+                boxes = getattr(res, 'boxes', None)
+                if boxes is not None and len(boxes) > 0:
+                    for box in boxes:
+                        try:
+                            class_id = int(box.cls[0])
+                            class_name = self.names.get(class_id, str(class_id))
+                            confidence = float(box.conf[0])
+                            candidates.append((class_name, confidence))
+                        except Exception:
+                            continue
+
+                probs = getattr(res, 'probs', None)
+                if probs is not None:
+                    try:
+                        # topk from probs tensor
+                        vals, idxs = torch.topk(probs.data, k=min(topk, probs.data.shape[-1]))
+                        for score, class_id in zip(vals.tolist(), idxs.tolist()):
+                            class_name = self.names.get(int(class_id), str(int(class_id)))
+                            candidates.append((class_name, float(score)))
+                    except Exception:
+                        pass
+
+            # run on full image
+            results = self.model(img_array, conf=0.001, verbose=False)
+            for res in results:
+                add_from_results(res)
+
+            # tile the image for classification-style models to harvest more items
+            try:
+                tiles = self._split_tiles(pil_image, grid_size=(3, 3))
+                for tile in tiles:
+                    tile_arr = np.array(tile)
+                    tile_res = self.model(tile_arr, conf=0.001, verbose=False)
+                    for tr in tile_res:
+                        add_from_results(tr)
+            except Exception:
+                # non-fatal
+                pass
+
+            # sort by confidence and unique by name
+            candidates.sort(key=lambda x: x[1], reverse=True)
+            seen = set()
+            out = []
+            for name, conf in candidates:
+                if name not in seen:
+                    seen.add(name)
+                    out.append({"name": name, "confidence": conf})
+                if len(out) >= topk:
+                    break
+
+            return out
+        except Exception as e:
+            print(f"[vision_service] detect error: {e}")
+            return []
+
+    def detect_multiple_items(self, base64_image, top_n_per_tile=2, grid_size=(3, 3), conf_threshold=0.1):
+        """Backward-compatible wrapper that returns list of {name, confidence}.
+
+        This mirrors older helper names used elsewhere in the codebase.
+        """
+        preds = self.detect_with_confidence(base64_image, topk=8)
+        return preds
+
+    def detect_ingredients(self, base64_image):
+        """Return a simple list of ingredient names (strings).
+
+        This is used by older callers that expect a list of strings.
+        """
+        preds = self.detect_with_confidence(base64_image, topk=8)
+        return [p['name'] for p in preds]
+
+
+# singleton
 vision_service = VisionService()
