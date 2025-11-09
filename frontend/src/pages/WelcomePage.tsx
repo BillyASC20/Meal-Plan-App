@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import { GlassButton } from '../components/GlassButton'
+import Navbar from '../components/Navbar'
 import './WelcomePage.css'
 
 export const WelcomePage = () => {
@@ -22,6 +23,8 @@ export const WelcomePage = () => {
 
   return (
     <div className="welcome-page">
+      <Navbar />
+      
       {/* Animated background blobs */}
       <div className="blob blob-1"></div>
       <div className="blob blob-2"></div>
@@ -40,28 +43,52 @@ export const WelcomePage = () => {
           transition={{ duration: 0.8, delay: 0.2 }}
         >
           <svg viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
-            {/* Elegant plate with utensils */}
-            <circle cx="60" cy="60" r="45" fill="url(#plateGradient)" opacity="0.15"/>
-            <circle cx="60" cy="60" r="35" stroke="url(#goldGradient)" strokeWidth="2" fill="none"/>
+            {/* Modern geometric logo - hexagon with inner shapes */}
+            <path 
+              d="M60 10 L95 30 L95 70 L60 90 L25 70 L25 30 Z" 
+              stroke="url(#modernGradient)" 
+              strokeWidth="2" 
+              fill="none"
+              opacity="0.6"
+            />
+            <path 
+              d="M60 25 L82 37.5 L82 62.5 L60 75 L38 62.5 L38 37.5 Z" 
+              stroke="url(#modernGradient)" 
+              strokeWidth="2.5" 
+              fill="url(#fillGradient)"
+              opacity="0.4"
+            />
             
-            {/* Fork */}
-            <path d="M40 45 L40 55 M43 45 L43 55 M46 45 L46 55 M43 55 L43 70" stroke="url(#goldGradient)" strokeWidth="2" strokeLinecap="round"/>
-            
-            {/* Knife */}
-            <path d="M77 45 L77 70 M77 45 L74 48" stroke="url(#goldGradient)" strokeWidth="2" strokeLinecap="round"/>
-            
-            {/* Elegant center decoration */}
-            <circle cx="60" cy="60" r="8" fill="none" stroke="url(#goldGradient)" strokeWidth="1.5"/>
-            <path d="M60 52 L60 68 M52 60 L68 60" stroke="url(#goldGradient)" strokeWidth="1.5" strokeLinecap="round"/>
+            {/* Center accent */}
+            <circle 
+              cx="60" 
+              cy="50" 
+              r="12" 
+              fill="none" 
+              stroke="url(#accentGradient)" 
+              strokeWidth="2"
+            />
+            <circle 
+              cx="60" 
+              cy="50" 
+              r="6" 
+              fill="url(#accentGradient)" 
+              opacity="0.8"
+            />
             
             <defs>
-              <linearGradient id="goldGradient" x1="20" y1="20" x2="100" y2="100" gradientUnits="userSpaceOnUse">
-                <stop stopColor="#d4af37"/>
-                <stop offset="1" stopColor="#ffd700"/>
+              <linearGradient id="modernGradient" x1="25" y1="10" x2="95" y2="90" gradientUnits="userSpaceOnUse">
+                <stop stopColor="#00d4aa"/>
+                <stop offset="0.5" stopColor="#0052ff"/>
+                <stop offset="1" stopColor="#7c3aed"/>
               </linearGradient>
-              <linearGradient id="plateGradient" x1="15" y1="15" x2="105" y2="105" gradientUnits="userSpaceOnUse">
-                <stop stopColor="#d4af37" stopOpacity="0.3"/>
-                <stop offset="1" stopColor="#ffd700" stopOpacity="0.1"/>
+              <linearGradient id="fillGradient" x1="38" y1="25" x2="82" y2="75" gradientUnits="userSpaceOnUse">
+                <stop stopColor="#00d4aa" stopOpacity="0.15"/>
+                <stop offset="1" stopColor="#0052ff" stopOpacity="0.1"/>
+              </linearGradient>
+              <linearGradient id="accentGradient" x1="48" y1="38" x2="72" y2="62" gradientUnits="userSpaceOnUse">
+                <stop stopColor="#00d4aa"/>
+                <stop offset="1" stopColor="#0052ff"/>
               </linearGradient>
             </defs>
           </svg>
@@ -141,7 +168,7 @@ export const WelcomePage = () => {
           {...fadeInUp}
           transition={{ duration: 0.6, delay: 0.7 }}
         >
-          No sign up required • Free to use
+          Smart meal planning with AI
         </motion.p>
       </motion.div>
     </div>

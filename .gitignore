@@ -8,13 +8,13 @@ venv/
 env/
 ENV/
 backend/.env
-.env
 
 # Node
 node_modules/
 dist/
 dist-ssr/
 *.local
+frontend/.env
 
 # Editor
 .vscode/
@@ -33,49 +33,18 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# Datasets and training artifacts (large files)
-datasets/
-backend/datasets/
-runs/
-backend/runs/
-training_archive/
-
-# Model files - ignore generic pretrained models but keep custom trained ones
-*.pth
-*.onnx
-*.weights
-yolov8n.pt
-yolo11n.pt
-yolov5*.pt
-# Allow custom trained models in backend/models/
-!backend/models/ingredients.pt
-!backend/models/best.pt
-
-# YOLO/Model cache
+# Model cache
 .cache/
-yolov5/
-yolov8/
-ultralytics/
 
-# Hugging Face cache
-huggingface/models/
+# Model weights (downloaded during Docker build)
+backend/models/grounded_sam/*.pth
 
-# Large media files
-*.avif
-*.mp4
-*.avi
-*.mov
-fridge-hero-mobile.avif
+# Test files
+test_*.py
+test-*.js
+*_test.py
+*_test.js
 
-# Image files (but allow training results)
-*.jpg
-*.jpeg
-*.png
-*.gif
-!backend/models/training_results/*.jpg
-!backend/models/training_results/*.png
-
-# Test outputs and temp files
-test_images/
+# Temp files
 temp/
 tmp/

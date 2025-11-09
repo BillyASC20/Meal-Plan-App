@@ -1,53 +1,18 @@
-# Python
 __pycache__/
 *.py[cod]
-*.so
-*.egg
-*.egg-info/
-dist/
-build/
-.Python
-
-# Environment
+*.pyc
 .env
 .env.local
 .venv
 venv/
-ENV/
-
-# IDE
 .vscode/
 .idea/
-*.swp
-*.swo
-*~
-
-# OS
 .DS_Store
-Thumbs.db
-
-# Logs
 *.log
-
-# Testing
-.coverage
-.pytest_cache/
-
-# Frontend (not needed in backend image)
-frontend/
-node_modules/
-
-# Git
 .git/
 .gitignore
-
-# Documentation
 *.md
-!README.md
 
-# Deployment
-.vercel/
-.railway/
 
 # Models (will download during build)
 # backend/models/grounded_sam/*.pth

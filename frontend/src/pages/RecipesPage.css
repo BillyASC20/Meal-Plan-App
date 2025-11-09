@@ -1,7 +1,23 @@
 .recipes-page {
   min-height: 100vh;
-  background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
-  padding: 2rem;
+  background: #000000;
+  padding: 72px 2rem 2rem;
+  position: relative;
+  overflow-x: hidden;
+}
+
+.recipes-page::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: 
+    radial-gradient(circle at 20% 30%, rgba(212, 175, 55, 0.03) 0%, transparent 50%),
+    radial-gradient(circle at 80% 70%, rgba(212, 175, 55, 0.02) 0%, transparent 50%);
+  pointer-events: none;
+  z-index: 0;
 }
 
 .loading-container {
@@ -28,52 +44,109 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  max-width: 1200px;
-  margin: 0 auto 2rem;
+  max-width: 1400px;
+  margin: 0 auto 3rem;
+  position: relative;
+  z-index: 1;
+  padding: 1.5rem 2rem;
+  background: rgba(18, 18, 18, 0.8);
+  border-radius: 12px;
+  border: 1px solid rgba(212, 175, 55, 0.15);
+  backdrop-filter: blur(20px);
+}
+
+.back-button {
+  background: transparent;
+  border: 1px solid rgba(212, 175, 55, 0.3);
+  color: #d4af37;
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  letter-spacing: 0.3px;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', system-ui, sans-serif;
+}
+
+.back-button:hover {
+  background: rgba(212, 175, 55, 0.1);
+  border-color: #d4af37;
 }
 
 .recipes-title {
   font-size: 2rem;
-  font-weight: 700;
-  color: white;
+  font-weight: 500;
+  color: #d4af37;
+  letter-spacing: -0.5px;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', system-ui, sans-serif;
+}
+
+.spacer {
+  width: 140px; /* Same as back button to center title */
 }
 
 .recipes-content {
-  max-width: 1200px;
+  max-width: 1400px;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
   gap: 2rem;
+  position: relative;
+  z-index: 1;
 }
 
 .ingredients-card {
   text-align: center;
+  background: rgba(18, 18, 18, 0.8) !important;
+  border: 1px solid rgba(212, 175, 55, 0.15) !important;
+  box-shadow: none !important;
 }
 
 .section-title {
   font-size: 1.5rem;
-  font-weight: 700;
-  color: white;
+  font-weight: 500;
+  color: #d4af37;
   margin-bottom: 1.5rem;
+  letter-spacing: -0.3px;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', system-ui, sans-serif;
 }
 
 .ingredients-tags {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.75rem;
+  gap: 1rem;
   justify-content: center;
+  padding: 0.5rem;
 }
 
 .ingredient-tag {
-  background: linear-gradient(135deg, rgba(59, 130, 246, 0.3), rgba(147, 51, 234, 0.3));
-  border: 1px solid rgba(59, 130, 246, 0.5);
-  color: white;
-  padding: 0.5rem 1rem;
+  background: transparent;
+  border: 1px solid rgba(212, 175, 55, 0.3);
+  color: #d4af37;
+  padding: 0.625rem 1.25rem;
   border-radius: 20px;
   font-size: 0.875rem;
-  font-weight: 600;
+  font-weight: 500;
   text-transform: capitalize;
-  backdrop-filter: blur(10px);
+  transition: all 0.2s ease;
+  letter-spacing: 0.3px;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', system-ui, sans-serif;
+}
+
+.ingredient-tag::before {
+  display: none;
+}
+
+.ingredient-tag:hover {
+  background: rgba(212, 175, 55, 0.1);
+  border-color: #d4af37;
+  transform: none;
+  box-shadow: none;
+}
+
+.ingredient-tag:hover::before {
+  left: 100%;
 }
 
 .recipes-grid {
@@ -301,12 +374,36 @@
     padding: 1rem;
   }
 
+  .recipes-page::before {
+    opacity: 0.5;
+  }
+
   .recipes-header {
-    margin-bottom: 1rem;
+    margin-bottom: 2rem;
+    padding: 1rem 1.5rem;
+    border-radius: 16px;
   }
 
   .recipes-title {
+    font-size: 1.75rem;
+  }
+
+  .back-button {
+    padding: 0.625rem 1.25rem;
+    font-size: 0.9rem;
+  }
+
+  .spacer {
+    width: 100px;
+  }
+
+  .section-title {
     font-size: 1.5rem;
+  }
+
+  .ingredient-tag {
+    padding: 0.625rem 1.25rem;
+    font-size: 0.9rem;
   }
 
   .recipes-grid {
@@ -362,9 +459,142 @@
   51%, 100% { opacity: 0; }
 }
 
+.recipes-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
 .no-recipes {
   text-align: center;
-  padding: 60px 20px;
+  padding: 80px 20px;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 1.125rem;
+  font-weight: 500;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 20px;
+  border: 2px dashed rgba(255, 255, 255, 0.1);
+}
+
+/* Streaming Indicator - ChatGPT style */
+.streaming-indicator {
+  margin-top: 1rem;
+}
+
+.generating-message {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.5rem;
+  padding: 3rem;
+  background: rgba(18, 18, 18, 0.8);
+  border-radius: 12px;
+  border: 1px solid rgba(212, 175, 55, 0.15);
+}
+
+.thinking-dots {
+  display: flex;
+  gap: 0.75rem;
+  font-size: 2rem;
+  color: #d4af37;
+}
+
+.thinking-dots span {
+  display: inline-block;
+}
+
+.generating-message p {
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 1rem;
+  font-weight: 400;
+  letter-spacing: 0.3px;
+}
+
+.stream-preview {
+  margin-top: 1rem;
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 8px;
+  max-height: 150px;
+  overflow: hidden;
+}
+
+.stream-preview pre {
+  margin: 0;
+  font-size: 0.75rem;
   color: rgba(255, 255, 255, 0.6);
-  font-size: 18px;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  font-family: 'Courier New', monospace;
+}
+
+.recipes-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+/* History Page Specific Styles */
+.history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.history-search-card {
+  padding: 1.5rem !important;
+}
+
+.history-search-header {
+  display: grid;
+  grid-template-columns: 200px 1fr auto;
+  gap: 1.5rem;
+  align-items: start;
+}
+
+.history-image-preview {
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.history-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.history-date {
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.expand-icon {
+  color: rgba(212, 175, 55, 0.8);
+  font-size: 1.2rem;
+  transition: transform 0.3s ease;
+}
+
+.history-search-header:hover .expand-icon {
+  color: rgba(212, 175, 55, 1);
+}
+
+.history-recipes {
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  padding-top: 1.5rem;
+}
+
+@media (max-width: 768px) {
+  .history-search-header {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+  
+  .history-image-preview img {
+    height: 200px !important;
+  }
 }
