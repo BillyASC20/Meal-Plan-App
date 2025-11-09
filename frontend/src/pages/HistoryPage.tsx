@@ -6,6 +6,8 @@ import RecipeCard from '../components/RecipeCard'
 import Navbar from '../components/Navbar'
 import './RecipesPage.css' // Reuse recipes page styles
 
+const BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:5001'
+
 interface RecipeSearch {
   id: string
   image_url: string
@@ -40,7 +42,7 @@ export const HistoryPage = () => {
           return
         }
 
-        const response = await fetch('http://localhost:5001/api/recipe-history', {
+        const response = await fetch(`${BASE_URL}/api/recipe-history`, {
           headers: {
             'Authorization': `Bearer ${token}`
           }
@@ -80,7 +82,7 @@ export const HistoryPage = () => {
       setDeleteConfirmId(null)
       const token = localStorage.getItem('access_token')
       
-      const response = await fetch(`http://localhost:5001/api/delete-recipe-search/${searchId}`, {
+      const response = await fetch(`${BASE_URL}/api/delete-recipe-search/${searchId}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`

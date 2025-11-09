@@ -25,6 +25,7 @@ export interface DetectedResult {
   image_with_boxes?: string
 }
 
+// Force Railway rebuild - using nullish coalescing for proper empty string handling
 const BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:5001'
 
 function getAuthHeaders(): HeadersInit {
