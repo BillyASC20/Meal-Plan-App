@@ -25,7 +25,7 @@ export interface DetectedResult {
   image_with_boxes?: string
 }
 
-const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001'
+const BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:5001'
 
 function getAuthHeaders(): HeadersInit {
   const headers: HeadersInit = {
