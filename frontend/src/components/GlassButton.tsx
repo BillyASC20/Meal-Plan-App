@@ -2,7 +2,6 @@ import type { ButtonHTMLAttributes, ReactNode } from 'react'
 import { motion } from 'framer-motion'
 import './GlassButton.css'
 
-// Restrict passthrough props to avoid conflicts with framer-motion HTMLMotionProps typing
 interface GlassButtonProps {
   children: ReactNode;
   variant?: 'primary' | 'secondary';

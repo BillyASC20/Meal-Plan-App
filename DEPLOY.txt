@@ -1,0 +1,25 @@
+SINGLE-SITE DEPLOYMENT
+======================
+
+The app now serves frontend + backend from ONE URL!
+
+OPTION 1: Railway (Recommended)
+--------------------------------
+1. Push to GitHub
+2. Railway.app → New Project → Deploy from GitHub
+3. Add environment variables:
+   - OPENAI_API_KEY
+   - SUPABASE_URL
+   - SUPABASE_SERVICE_ROLE_KEY
+4. Done! Visit: https://your-app.up.railway.app
+
+OPTION 2: Render
+-----------------
+1. Push to GitHub
+2. Render.com → New Web Service → Docker
+3. Add same environment variables
+4. Done! Visit: https://your-app.onrender.com
+
+The frontend is built into the Docker image and served by Flask!
+No separate frontend deployment needed.
+

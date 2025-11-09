@@ -26,18 +26,66 @@ class GroundedSAMService:
         
         self.food_categories = [
             "apple", "banana", "orange", "lemon", "lime", "strawberry", "blueberry",
+            "grape", "watermelon", "melon", "pineapple", "mango", "peach", "pear",
+            "cherry", "kiwi", "pomegranate", "plum", "apricot", "raspberry", "blackberry",
+            "cantaloupe", "honeydew", "papaya", "passion fruit", "dragon fruit", "guava",
+            "fig", "date", "cranberry", "grapefruit", "tangerine", "clementine", "mandarin",
+            "coconut", "persimmon", "lychee", "star fruit", "kumquat", "nectarine",
             "tomato", "potato", "carrot", "broccoli", "lettuce", "cucumber", "pepper",
-            "onion", "garlic", "mushroom", "corn", "avocado", "pumpkin",
-            "bread", "cheese", "milk", "egg", "butter", "yogurt",
-            "chicken", "beef", "pork", "fish", "salmon", "shrimp",
-            "rice", "pasta", "noodles", "cereal",
-            "pizza", "burger", "sandwich", "hot dog", "taco",
-            "cake", "cookie", "donut", "pie", "chocolate",
-            "bottle", "can", "jar", "box", "package", "container"
+            "bell pepper", "onion", "garlic", "mushroom", "corn", "avocado", "pumpkin",
+            "spinach", "cabbage", "eggplant", "zucchini", "squash", "celery", "radish",
+            "cauliflower", "brussels sprouts", "asparagus", "artichoke", "beet", "turnip",
+            "parsnip", "leek", "scallion", "green onion", "shallot", "ginger", "kale",
+            "chard", "collard greens", "arugula", "bok choy", "fennel", "okra", "yam",
+            "sweet potato", "green beans", "peas", "snap peas", "edamame", "bean sprouts",
+            "jalapeno", "habanero", "chili pepper", "poblano", "serrano", "cayenne",
+            "chicken", "chicken breast", "chicken thigh", "chicken wing", "whole chicken",
+            "beef", "steak", "ribeye", "sirloin", "t-bone", "filet mignon", "brisket",
+            "ground beef", "beef roast", "short ribs", "beef chuck", "flank steak",
+            "pork", "pork chop", "pork loin", "pork belly", "pork ribs", "pork shoulder",
+            "bacon", "sausage", "hot dog", "bratwurst", "chorizo", "salami", "pepperoni",
+            "ham", "prosciutto", "pancetta", "canadian bacon", "turkey bacon",
+            "turkey", "turkey breast", "ground turkey", "turkey leg", "whole turkey",
+            "lamb", "lamb chop", "leg of lamb", "lamb shank", "ground lamb",
+            "duck", "duck breast", "whole duck", "duck leg",
+            "veal", "veal cutlet", "veal chop",
+            "venison", "bison", "rabbit", "quail", "pheasant", "goose",
+            "fish", "salmon", "tuna", "cod", "halibut", "tilapia", "trout", "bass",
+            "catfish", "mahi mahi", "swordfish", "snapper", "grouper", "flounder",
+            "mackerel", "sardine", "anchovy", "herring", "sea bass", "sole",
+            "shrimp", "prawn", "crab", "lobster", "crayfish", "crawfish",
+            "clam", "mussel", "oyster", "scallop", "squid", "calamari", "octopus",
+            "milk", "whole milk", "skim milk", "almond milk", "soy milk", "oat milk",
+            "cheese", "cheddar", "mozzarella", "parmesan", "swiss cheese", "brie",
+            "feta", "goat cheese", "cream cheese", "blue cheese", "gouda", "provolone",
+            "egg", "eggs", "egg white", "egg yolk",
+            "butter", "margarine", "ghee",
+            "yogurt", "greek yogurt", "sour cream", "cream", "heavy cream", "whipped cream",
+            "cottage cheese", "ricotta", "mascarpone",
+            "bread", "white bread", "wheat bread", "sourdough", "rye bread", "baguette",
+            "pita", "naan", "tortilla", "wrap", "bagel", "english muffin", "croissant",
+            "rice", "white rice", "brown rice", "wild rice", "jasmine rice", "basmati rice",
+            "pasta", "spaghetti", "penne", "fettuccine", "linguine", "macaroni", "lasagna",
+            "noodles", "ramen", "udon", "soba", "rice noodles", "egg noodles",
+            "cereal", "oatmeal", "oats", "granola", "muesli",
+            "flour", "wheat flour", "all purpose flour", "bread flour", "cake flour",
+            "quinoa", "couscous", "bulgur", "farro", "barley", "millet",
+            "pizza", "burger", "hamburger", "cheeseburger", "sandwich", "sub",
+            "hot dog", "taco", "burrito", "quesadilla", "enchilada", "fajita",
+            "salad", "caesar salad", "garden salad", "greek salad", "cobb salad",
+            "soup", "stew", "chili", "curry", "casserole", "lasagna", "meatloaf",
+            "cake", "chocolate cake", "vanilla cake", "cheesecake", "cupcake",
+            "cookie", "chocolate chip cookie", "sugar cookie", "oatmeal cookie",
+            "brownie", "blondie", "bar", "granola bar", "energy bar",
+            "donut", "doughnut", "pie", "apple pie", "pumpkin pie", "pecan pie",
+            "chocolate", "dark chocolate", "milk chocolate", "white chocolate",
+            "candy", "gummy", "lollipop", "caramel", "toffee",
+            "ice cream", "gelato", "sorbet", "frozen yogurt", "popsicle",
+            "bottle", "can", "jar", "box", "package", "container", "bowl", "plate", "cup"
         ]
         
-        self.box_threshold = 0.15
-        self.text_threshold = 0.15
+        self.box_threshold = 0.18  # Lower for more detections
+        self.text_threshold = 0.18  # Lower for more detections
         
         if not DEPENDENCIES_AVAILABLE:
             print("[grounded_sam_service] Running in fallback mode (dependencies not available)")
@@ -54,7 +102,9 @@ class GroundedSAMService:
         backend_dir = Path(__file__).resolve().parent
         models_dir = backend_dir / "models" / "grounded_sam"
         
-        grounding_dino_config = backend_dir / "GroundingDINO" / "groundingdino" / "config" / "GroundingDINO_SwinT_OGC.py"
+        import groundingdino
+        grounding_dino_package_dir = Path(groundingdino.__file__).parent
+        grounding_dino_config = grounding_dino_package_dir / "config" / "GroundingDINO_SwinT_OGC.py"
         grounding_dino_checkpoint = models_dir / "groundingdino_swint_ogc.pth"
         sam_checkpoint = models_dir / "sam_vit_b_01ec64.pth"  # Using base model (smaller, faster)
         
@@ -110,8 +160,42 @@ class GroundedSAMService:
         image = Image.open(io.BytesIO(data)).convert('RGB')
         return image
     
+    def _calculate_iou(self, box1, box2):
+        """Calculate Intersection over Union between two bounding boxes"""
+        x1_min, y1_min, x1_max, y1_max = box1["x1"], box1["y1"], box1["x2"], box1["y2"]
+        x2_min, y2_min, x2_max, y2_max = box2["x1"], box2["y1"], box2["x2"], box2["y2"]
+        
+        inter_x_min = max(x1_min, x2_min)
+        inter_y_min = max(y1_min, y2_min)
+        inter_x_max = min(x1_max, x2_max)
+        inter_y_max = min(y1_max, y2_max)
+        
+        if inter_x_max <= inter_x_min or inter_y_max <= inter_y_min:
+            return 0.0
+        
+        inter_area = (inter_x_max - inter_x_min) * (inter_y_max - inter_y_min)
+        
+        box1_area = (x1_max - x1_min) * (y1_max - y1_min)
+        box2_area = (x2_max - x2_min) * (y2_max - y2_min)
+        union_area = box1_area + box2_area - inter_area
+        
+        return inter_area / union_area if union_area > 0 else 0.0
+    
     def _create_text_prompt(self):
-        return ". ".join(self.food_categories) + "."
+        essential_categories = [
+            "apple", "banana", "orange", "lemon", "lime", "strawberry", "grape",
+            "watermelon", "pineapple", "mango", "peach", "pear", "cherry", "kiwi",
+            "blueberry", "raspberry", "blackberry", "avocado", "coconut", "grapefruit",
+            "tomato", "potato", "carrot", "broccoli", "lettuce", "cucumber", "pepper",
+            "onion", "garlic", "mushroom", "corn", "pumpkin", "spinach", "cabbage",
+            "cauliflower", "celery", "zucchini", "eggplant", "asparagus", "green beans",
+            "chicken", "beef", "pork", "fish", "salmon", "shrimp", "tuna", "turkey",
+            "bacon", "sausage", "ham", "steak", "egg", "duck", "lamb",
+            "milk", "cheese", "butter", "yogurt", "cream",
+            "bread", "rice", "pasta", "noodles", "cereal", "tortilla",
+            "pizza", "burger", "sandwich", "salad", "soup"
+        ]
+        return ". ".join(essential_categories) + "."
     
     def detect_with_confidence(self, base64_image, topk: int = 25):
         if not self.is_ready or self.grounding_dino_model is None:
@@ -124,9 +208,9 @@ class GroundedSAMService:
             
             text_prompt = self._create_text_prompt()
             
-            detections = self.grounding_dino_model.predict_with_classes(
+            detections, phrases = self.grounding_dino_model.predict_with_caption(
                 image=image_np,
-                classes=self.food_categories,
+                caption=text_prompt,
                 box_threshold=self.box_threshold,
                 text_threshold=self.text_threshold
             )
@@ -136,16 +220,48 @@ class GroundedSAMService:
             if detections is not None and len(detections.xyxy) > 0:
                 boxes = detections.xyxy
                 confidences = detections.confidence
-                class_ids = detections.class_id
                 
                 for i in range(len(boxes)):
                     box = boxes[i]
                     confidence = float(confidences[i])
-                    class_id = int(class_ids[i])
-                    class_name = self.food_categories[class_id]
+                    
+                    phrase = phrases[i] if i < len(phrases) else "unknown"
+                    
+                    phrase_clean = phrase.lower().strip()
+                    
+                    special_char_count = sum(1 for c in phrase_clean if not c.isalnum() and c != ' ')
+                    if special_char_count > 2 or len(phrase_clean) < 2:
+                        print(f"[grounded_sam_service] Skipping noisy detection: '{phrase}'")
+                        continue
+                    
+                    matched_name = None
+                    best_match_score = 0
+                    
+                    for food_cat in self.food_categories:
+                        if food_cat == phrase_clean:
+                            matched_name = food_cat
+                            best_match_score = 100
+                            break
+                        elif food_cat in phrase_clean:
+                            score = len(food_cat) / len(phrase_clean)
+                            if score > best_match_score:
+                                matched_name = food_cat
+                                best_match_score = score
+                        elif phrase_clean in food_cat:
+                            score = len(phrase_clean) / len(food_cat)
+                            if score > best_match_score:
+                                matched_name = food_cat
+                                best_match_score = score
+                    
+                    if matched_name is None and best_match_score < 0.5:
+                        if any(c.isalpha() for c in phrase_clean):
+                            matched_name = phrase_clean
+                        else:
+                            print(f"[grounded_sam_service] Skipping non-food detection: '{phrase}'")
+                            continue
                     
                     candidates.append({
-                        "name": class_name,
+                        "name": matched_name,
                         "confidence": confidence,
                         "bbox": {
                             "x1": float(box[0]),
@@ -156,9 +272,25 @@ class GroundedSAMService:
                     })
             
             candidates.sort(key=lambda x: x["confidence"], reverse=True)
+            
+            filtered = []
+            for candidate in candidates:
+                should_add = True
+                for existing in filtered:
+                    iou = self._calculate_iou(candidate["bbox"], existing["bbox"])
+                    if iou > 0.5 and candidate["name"] == existing["name"]:
+                        should_add = False
+                        break
+                    if iou > 0.7:
+                        should_add = False
+                        break
+                
+                if should_add:
+                    filtered.append(candidate)
+            
             seen = set()
             out = []
-            for item in candidates:
+            for item in filtered:
                 if item["name"] not in seen:
                     seen.add(item["name"])
                     out.append(item)

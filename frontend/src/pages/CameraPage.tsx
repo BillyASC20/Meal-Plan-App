@@ -3,6 +3,7 @@ import { motion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import { GlassCard } from '../components/GlassCard'
 import { GlassButton } from '../components/GlassButton'
+import Navbar from '../components/Navbar'
 import './CameraPage.css'
 import { api } from '../components/api'
 
@@ -12,6 +13,9 @@ export const CameraPage = () => {
   const [detectedItems, setDetectedItems] = useState<string[]>([])
   const [uploadedImage, setUploadedImage] = useState<string | null>(null)
   const [predictions, setPredictions] = useState<{name: string, confidence: number}[]>([])
+  const [hasDetected, setHasDetected] = useState(false) // Track if detection has been run
+  const [isDragging, setIsDragging] = useState(false) // Track drag state
+  const [showAuthModal, setShowAuthModal] = useState(false) // Track auth modal
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -20,6 +24,36 @@ export const CameraPage = () => {
       const reader = new FileReader()
       reader.onloadend = () => {
         setUploadedImage(reader.result as string)
+        setDetectedItems([]) // Clear previous detection
+        setHasDetected(false) // Reset detection state
+        setPredictions([])
+      }
+      reader.readAsDataURL(file)
+    }
+  }
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragging(true)
+  }
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragging(false)
+  }
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragging(false)
+    
+    const file = e.dataTransfer.files?.[0]
+    if (file && file.type.startsWith('image/')) {
+      const reader = new FileReader()
+      reader.onloadend = () => {
+        setUploadedImage(reader.result as string)
+        setDetectedItems([])
+        setHasDetected(false)
+        setPredictions([])
       }
       reader.readAsDataURL(file)
     }
@@ -29,35 +63,10 @@ export const CameraPage = () => {
     fileInputRef.current?.click()
   }
 
-  const loadSampleHero = async () => {
-    try {
-      setIsDetecting(true)
-      const dataUrl = await api.getHeroImageDataURL()
-      setUploadedImage(dataUrl)
-      // auto-run detection after loading
-      const result = await api.detectIngredients(dataUrl)
-      setPredictions(result.predictions || [])
-      const allNames = (result.predictions || []).map(p => p.name)
-      
-      // Update to show image with bounding boxes
-      if (result.image_with_boxes) {
-        setUploadedImage(result.image_with_boxes)
-      }
-      
-      setDetectedItems(allNames)
-      if (allNames.length) {
-        sessionStorage.setItem('detectedIngredients', JSON.stringify(allNames))
-      }
-    } catch (e) {
-      console.error('Failed to load hero sample', e)
-    } finally {
-      setIsDetecting(false)
-    }
-  }
-
   const detectIngredients = async () => {
     if (!uploadedImage) return
     setIsDetecting(true)
+    setHasDetected(true) // Mark that detection has been run
     try {
       const result = await api.detectIngredients(uploadedImage)
       
@@ -74,8 +83,13 @@ export const CameraPage = () => {
       } else {
         setDetectedItems([]) // empty list -> UI will show nothing detected message
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error detecting ingredients:', err)
+      if (err.message === 'Authentication required') {
+        setShowAuthModal(true)
+        setIsDetecting(false)
+        return
+      }
       setDetectedItems([])
     } finally {
       setIsDetecting(false)
@@ -83,11 +97,26 @@ export const CameraPage = () => {
   }
 
   const generateRecipes = async () => {
-    // Navigate to results page with detected ingredients
-    if (detectedItems.length > 0) {
-      navigate('/recipes', { state: { ingredients: detectedItems } })
+    if (detectedItems.length > 0 && uploadedImage) {
+      try {
+        setIsDetecting(true)
+        
+        const imageUrl = await api.uploadImage(uploadedImage)
+        console.log('Image uploaded:', imageUrl)
+        
+        navigate('/recipes', { 
+          state: { 
+            ingredients: detectedItems,
+            imageUrl: imageUrl
+          } 
+        })
+      } catch (err) {
+        console.error('Error uploading image:', err)
+        navigate('/recipes', { state: { ingredients: detectedItems } })
+      } finally {
+        setIsDetecting(false)
+      }
     } else {
-      // try to use persisted ingredients if available
       const saved = sessionStorage.getItem('detectedIngredients')
       const parsed = saved ? (JSON.parse(saved) as string[]) : []
       navigate('/recipes', { state: { ingredients: parsed } })
@@ -96,6 +125,8 @@ export const CameraPage = () => {
 
   return (
     <div className="camera-page">
+      <Navbar />
+      
       <div className="camera-header">
         <button className="back-button" onClick={() => navigate('/')}>
           ← Back
@@ -112,6 +143,14 @@ export const CameraPage = () => {
                 className="upload-placeholder"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+                style={{
+                  border: isDragging ? '2px dashed rgba(139, 92, 246, 0.8)' : '2px dashed rgba(255, 255, 255, 0.2)',
+                  backgroundColor: isDragging ? 'rgba(139, 92, 246, 0.1)' : 'transparent',
+                  transition: 'all 0.3s ease'
+                }}
               >
                 <div className="upload-icon-container">
                   <svg className="upload-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -120,8 +159,8 @@ export const CameraPage = () => {
                     <path d="M12 3V15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                   </svg>
                 </div>
-                <h2>Upload Your Ingredients Photo</h2>
-                <p>Take a photo of your fridge or pantry</p>
+                <h2>{isDragging ? 'Drop your image here!' : 'Upload Your Ingredients Photo'}</h2>
+                <p>{isDragging ? 'Release to upload' : 'Take a photo of your fridge or pantry'}</p>
                 
                 <input
                   ref={fileInputRef}
@@ -136,11 +175,6 @@ export const CameraPage = () => {
                   <GlassButton onClick={triggerFileInput} size="large">
                     📷 Take Photo / Upload
                   </GlassButton>
-                  <div style={{ display: 'inline-block', marginLeft: '12px' }}>
-                    <GlassButton onClick={loadSampleHero} variant="secondary" size="medium">
-                      Use Sample Image
-                    </GlassButton>
-                  </div>
                 </div>
               </motion.div>
             ) : (
@@ -151,7 +185,7 @@ export const CameraPage = () => {
               >
                 <img src={uploadedImage} alt="Uploaded ingredients" className="uploaded-img" />
                 <div className="image-overlay">
-                  {!isDetecting && detectedItems.length === 0 && (
+                  {!isDetecting && !hasDetected && (
                     <GlassButton 
                       onClick={detectIngredients}
                       size="large"
@@ -170,20 +204,28 @@ export const CameraPage = () => {
               animate={{ opacity: 1 }}
               className="detecting-overlay"
             >
-              <div className="scanning-container">
-                <div className="scanning-animation">
-                  <div className="scan-line"></div>
-                  <div className="scan-pulse"></div>
-                </div>
-                <svg className="ai-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="currentColor" opacity="0.2"/>
-                  <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="2" fill="none"/>
-                </svg>
+              <div className="spinner-container">
+                <div className="gold-spinner"></div>
               </div>
               <p className="detecting-text">Analyzing ingredients...</p>
             </motion.div>
           )}
         </GlassCard>
+
+        {hasDetected && detectedItems.length === 0 && !isDetecting && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+          >
+            <GlassCard>
+              <div style={{ textAlign: 'center', padding: '20px' }}>
+                <p style={{ fontSize: '16px', opacity: 0.8 }}>
+                  No ingredients detected. Try uploading a clearer image with visible food items.
+                </p>
+              </div>
+            </GlassCard>
+          </motion.div>
+        )}
 
         {detectedItems.length > 0 && (
           <motion.div
@@ -240,7 +282,7 @@ export const CameraPage = () => {
             </GlassCard>
           </motion.div>
         )}
-        {uploadedImage && !isDetecting && detectedItems.length === 0 && (
+        {uploadedImage && !isDetecting && detectedItems.length === 0 && hasDetected && (
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
@@ -255,6 +297,7 @@ export const CameraPage = () => {
                   onClick={() => {
                     setDetectedItems([])
                     setUploadedImage(null)
+                    setHasDetected(false)
                   }}
                 >
                   Upload New Photo
@@ -264,6 +307,77 @@ export const CameraPage = () => {
           </motion.div>
         )}
       </div>
+
+      {/* Authentication Required Modal */}
+      {showAuthModal && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.7)',
+            backdropFilter: 'blur(8px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000
+          }}
+          onClick={() => setShowAuthModal(false)}
+        >
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ duration: 0.2 }}
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: 'rgba(20, 20, 40, 0.95)',
+              backdropFilter: 'blur(20px)',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              borderRadius: '16px',
+              padding: '32px',
+              maxWidth: '400px',
+              width: '90%',
+              boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)'
+            }}
+          >
+            <h2 style={{ 
+              fontSize: '24px', 
+              marginBottom: '16px',
+              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent'
+            }}>
+              Authentication Required
+            </h2>
+            <p style={{ 
+              color: 'rgba(255, 255, 255, 0.8)', 
+              marginBottom: '24px',
+              lineHeight: '1.6'
+            }}>
+              You need to be logged in to use this feature. Please log in or create an account to continue.
+            </p>
+            <div style={{ display: 'flex', gap: '12px', flexDirection: 'column' }}>
+              <div style={{ width: '100%' }}>
+                <GlassButton
+                  onClick={() => navigate('/login')}
+                >
+                  Log In
+                </GlassButton>
+              </div>
+              <div style={{ width: '100%' }}>
+                <GlassButton
+                  variant="secondary"
+                  onClick={() => navigate('/signup')}
+                >
+                  Sign Up
+                </GlassButton>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      )}
     </div>
   )
 }

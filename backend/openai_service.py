@@ -18,7 +18,7 @@ class RecipeList(BaseModel):
     recipes: List[Recipe] = Field(..., min_length=1, max_length=10)
 
 class OpenAIService:
-    SYSTEM_PROMPT = """You are a chef AI. Generate recipes as JSON matching this exact structure:
+    SYSTEM_PROMPT = """You are an expert chef AI. Generate detailed, professional recipes as JSON matching this exact structure:
 {
   "recipes": [
     {
@@ -27,12 +27,20 @@ class OpenAIService:
       "cook_time": 30,
       "servings": 4,
       "difficulty": "easy|medium|hard",
-      "ingredients": ["ingredient 1", "ingredient 2"],
-      "steps": ["step 1", "step 2"],
-      "tags": ["tag1", "tag2"]
+      "ingredients": ["2 cups all-purpose flour", "1 tsp salt", "3 large eggs"],
+      "steps": ["Preheat oven to 350°F. Grease a 9x13 pan.", "In a large bowl, whisk together flour and salt.", "Add eggs one at a time, beating well after each addition."],
+      "tags": ["vegetarian", "quick", "family-friendly"]
     }
   ]
 }
+
+IMPORTANT REQUIREMENTS:
+- Include PRECISE measurements in ingredients (cups, tbsp, oz, grams, etc.)
+- Include DETAILED cooking temperatures and times in steps
+- Make steps clear and specific (not just "mix ingredients")
+- Add helpful cooking tips in steps when relevant
+- Each step should be 1-2 sentences with actionable instructions
+- Use the provided ingredients creatively but realistically
 Return ONLY valid JSON. No markdown, no explanations."""
 
     def __init__(self):
@@ -42,7 +50,15 @@ Return ONLY valid JSON. No markdown, no explanations."""
         self.client = OpenAI(api_key=api_key)
 
     def generate_recipes_stream(self, ingredients):
-        prompt = f"Create 3-5 recipes using these ingredients: {', '.join(ingredients)}. Include creative combinations."
+        prompt = f"""Create 3-5 detailed, delicious recipes using these ingredients: {', '.join(ingredients)}.
+
+Requirements:
+- Use realistic cooking techniques and combinations
+- Include precise measurements for all ingredients
+- Provide detailed, step-by-step cooking instructions
+- Add cooking temperatures, times, and helpful tips
+- Make recipes that someone could actually cook
+- Include a mix of meal types (breakfast, lunch, dinner, etc.)"""
         
         stream = self.client.chat.completions.create(
             model="gpt-4o-mini",
@@ -59,7 +75,15 @@ Return ONLY valid JSON. No markdown, no explanations."""
                 yield chunk.choices[0].delta.content
 
     def generate_recipes_from_ingredients(self, ingredients):
-        prompt = f"Create 3-5 recipes using these ingredients: {', '.join(ingredients)}. Include creative combinations."
+        prompt = f"""Create 3-5 detailed, delicious recipes using these ingredients: {', '.join(ingredients)}.
+
+Requirements:
+- Use realistic cooking techniques and combinations
+- Include precise measurements for all ingredients
+- Provide detailed, step-by-step cooking instructions
+- Add cooking temperatures, times, and helpful tips
+- Make recipes that someone could actually cook
+- Include a mix of meal types (breakfast, lunch, dinner, etc.)"""
         
         response = self.client.chat.completions.create(
             model="gpt-4o-mini",
