@@ -50,15 +50,17 @@ Return ONLY valid JSON. No markdown, no explanations."""
         self.client = OpenAI(api_key=api_key)
 
     def generate_recipes_stream(self, ingredients):
-        prompt = f"""Create 3-5 detailed, delicious recipes using these ingredients: {', '.join(ingredients)}.
+        prompt = f"""Create 3-5 detailed, delicious recipes using ONLY these ingredients: {', '.join(ingredients)}.
 
-Requirements:
-- Use realistic cooking techniques and combinations
+STRICT REQUIREMENTS:
+- Use ONLY the ingredients listed above - do not add any other ingredients
+- You may use common pantry staples like salt, pepper, oil, and water ONLY if absolutely necessary
+- Do NOT suggest ingredients the user doesn't have
+- Create recipes that can realistically be made with just these ingredients
 - Include precise measurements for all ingredients
 - Provide detailed, step-by-step cooking instructions
 - Add cooking temperatures, times, and helpful tips
-- Make recipes that someone could actually cook
-- Include a mix of meal types (breakfast, lunch, dinner, etc.)"""
+- Include a mix of meal types (breakfast, lunch, dinner, etc.) if possible"""
         
         stream = self.client.chat.completions.create(
             model="gpt-4o-mini",
@@ -75,15 +77,17 @@ Requirements:
                 yield chunk.choices[0].delta.content
 
     def generate_recipes_from_ingredients(self, ingredients):
-        prompt = f"""Create 3-5 detailed, delicious recipes using these ingredients: {', '.join(ingredients)}.
+        prompt = f"""Create 3-5 detailed, delicious recipes using ONLY these ingredients: {', '.join(ingredients)}.
 
-Requirements:
-- Use realistic cooking techniques and combinations
+STRICT REQUIREMENTS:
+- Use ONLY the ingredients listed above - do not add any other ingredients
+- You may use common pantry staples like salt, pepper, oil, and water ONLY if absolutely necessary
+- Do NOT suggest ingredients the user doesn't have
+- Create recipes that can realistically be made with just these ingredients
 - Include precise measurements for all ingredients
 - Provide detailed, step-by-step cooking instructions
 - Add cooking temperatures, times, and helpful tips
-- Make recipes that someone could actually cook
-- Include a mix of meal types (breakfast, lunch, dinner, etc.)"""
+- Include a mix of meal types (breakfast, lunch, dinner, etc.) if possible"""
         
         response = self.client.chat.completions.create(
             model="gpt-4o-mini",

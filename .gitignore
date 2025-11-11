@@ -32,19 +32,3 @@ Thumbs.db
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-
-# Model cache
-.cache/
-
-# Model weights (downloaded during Docker build)
-backend/models/grounded_sam/*.pth
-
-# Test files
-test_*.py
-test-*.js
-*_test.py
-*_test.js
-
-# Temp files
-temp/
-tmp/

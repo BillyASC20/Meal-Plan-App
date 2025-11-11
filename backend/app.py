@@ -10,7 +10,15 @@ from auth_middleware import require_auth
 
 load_dotenv()
 
-from grounded_sam_service import grounded_sam_service as vision_service
+vision_service = None
+
+try:
+    from yolo_food_service import yolo_vision_service
+    vision_service = yolo_vision_service
+    print("[app] ✅ Using YOLOv8 food detector")
+except Exception as e:
+    print(f"[app] ❌ Failed to load YOLO detector: {e}")
+    vision_service = None
 
 app = Flask(__name__, static_folder='static', static_url_path='/static')
 CORS(app, resources={r"/*": {"origins": "*"}})
@@ -21,7 +29,7 @@ recipe_gen = RecipeGenerator()
 def health_check():
     return jsonify({
         "status": "healthy",
-        "service": "ready" if vision_service.is_ready else "loading"
+    "service": ("ready" if (vision_service and getattr(vision_service, 'is_ready', False)) else "loading")
     })
 
 @app.route('/detect-ingredients', methods=['POST'])
@@ -35,6 +43,8 @@ def detect_ingredients():
         image_data = data['image']
         print(f"[detect] Received image data, length: {len(image_data)}")
         
+        if vision_service is None:
+            return jsonify({"status": "error", "message": "Vision service unavailable"}), 500
         result = vision_service.detect_and_draw_boxes(image_data, topk=25)
         preds = result['detections']
         image_with_boxes = result['image_with_boxes']
@@ -44,8 +54,11 @@ def detect_ingredients():
         
         if isinstance(preds, list) and len(preds) > 0:
             first = preds[0]
-            if isinstance(first, dict) and "name" in first:
-                ingredients = [p["name"] for p in preds]
+            if isinstance(first, dict):
+                if "label" in first:
+                    ingredients = [p["label"] for p in preds]
+                else:
+                    ingredients = [str(p) for p in preds]
             else:
                 ingredients = [str(p) for p in preds]
         else:
@@ -58,11 +71,19 @@ def detect_ingredients():
         else:
             print(f"[detect] ✅ Returning {len(ingredients)} ingredients: {ingredients[:5]}")
 
+        formatted_predictions = []
+        for pred in preds:
+            if isinstance(pred, dict):
+                formatted_predictions.append({
+                    "name": pred.get("label") or pred.get("name", "unknown"),
+                    "confidence": pred.get("confidence", 0.0)
+                })
+
         return jsonify({
             "status": "success",
             "data": {
                 "ingredients": ingredients,
-                "predictions": preds,
+                "predictions": formatted_predictions,
                 "image_with_boxes": image_with_boxes,
                 **({"message": message} if message else {})
             }
@@ -123,7 +144,7 @@ def generate_recipes_stream():
             }), 400
         
         ingredients = data['ingredients']
-        image_url = data.get('image_url')  # Get image URL if provided
+        image_url = data.get('image_url')
         
         auth_header = request.headers.get('Authorization')
         user_id = None
@@ -144,15 +165,18 @@ def generate_recipes_stream():
                 print(f"[stream] Could not get user: {e}")
         
         def generate():
-            full_content = ""  # Buffer to collect all streamed content
+            full_content = ""
+            chunk_count = 0
             try:
-                import sys
                 for chunk in recipe_gen.openai_service.generate_recipes_stream(ingredients):
                     full_content += chunk
+                    chunk_count += 1
                     yield f"data: {json.dumps({'chunk': chunk})}\n\n"
-                    sys.stdout.flush()
+                
+                print(f"[stream] OpenAI streaming complete. Sent {chunk_count} chunks, total length: {len(full_content)}")
                 
             except Exception as e:
+                print(f"[stream] ❌ Error during streaming: {e}")
                 yield f"data: {json.dumps({'error': str(e)})}\n\n"
                 return
             
@@ -225,10 +249,12 @@ def generate_recipes_stream():
                     print(f"[stream] ⚠️ No user_id - skipping save")
                 if not image_url:
                     print(f"[stream] ⚠️ No image_url - skipping save")
+            
+            yield f"data: {json.dumps({'done': True})}\n\n"
         
         response = Response(generate(), mimetype='text/event-stream')
         response.headers['Cache-Control'] = 'no-cache'
-        response.headers['X-Accel-Buffering'] = 'no'  # Disable nginx buffering
+        response.headers['X-Accel-Buffering'] = 'no'
         response.headers['Connection'] = 'keep-alive'
         return response
     
@@ -241,7 +267,6 @@ def generate_recipes_stream():
 
 @app.route('/auth/signup', methods=['POST'])
 def auth_signup():
-    """Sign up a new user with Supabase"""
     try:
         from supabase import create_client
         
@@ -293,7 +318,6 @@ def auth_signup():
 
 @app.route('/auth/signin', methods=['POST'])
 def auth_signin():
-    """Sign in a user with Supabase"""
     try:
         from supabase import create_client
         
@@ -345,7 +369,6 @@ def auth_signin():
 
 @app.route('/auth/signout', methods=['POST'])
 def auth_signout():
-    """Sign out a user"""
     try:
         from supabase import create_client
         
@@ -383,7 +406,6 @@ def auth_signout():
 
 @app.route('/auth/reset-password', methods=['POST'])
 def auth_reset_password():
-    """Send password reset email"""
     try:
         from supabase import create_client
         
@@ -424,7 +446,6 @@ def auth_reset_password():
 @app.route('/api/upload-image', methods=['POST'])
 @require_auth
 def upload_image():
-    """Upload image to Supabase Storage and return URL"""
     try:
         from supabase import create_client
         import uuid
@@ -460,7 +481,7 @@ def upload_image():
         user_id = user.user.id
         
         data = request.get_json()
-        image_data = data.get('image')  # Base64 encoded image
+        image_data = data.get('image')
         
         if not image_data:
             return jsonify({
@@ -501,7 +522,6 @@ def upload_image():
 @app.route('/api/save-recipes', methods=['POST'])
 @require_auth
 def save_recipes():
-    """Save recipes and image reference to database"""
     try:
         from supabase import create_client
         
@@ -585,7 +605,6 @@ def save_recipes():
 @app.route('/api/recipe-history', methods=['GET'])
 @require_auth
 def get_recipe_history():
-    """Get user's recipe search history with all recipes"""
     try:
         from supabase import create_client
         
@@ -662,9 +681,7 @@ def get_recipe_history():
         }), 500
 
 @app.route('/api/delete-recipe-search/<search_id>', methods=['DELETE', 'OPTIONS'])
-@require_auth
 def delete_recipe_search(search_id):
-    """Delete a recipe search and its associated data (recipes + S3 image)"""
     if request.method == 'OPTIONS':
         return '', 200
     
@@ -750,15 +767,12 @@ def delete_recipe_search(search_id):
 @app.route('/', defaults={'path': ''}, methods=['GET'])
 @app.route('/<path:path>', methods=['GET'])
 def serve_frontend(path):
-    # API routes should return 404 if not found elsewhere
     if path.startswith('api/') or path.startswith('auth/') or path.startswith('detect-') or path.startswith('generate-') or path == 'health':
         return jsonify({"error": "Not found"}), 404
     
-    # Serve static files (js, css, assets, etc.)
     if path and os.path.exists(os.path.join(app.static_folder, path)):
         return send_from_directory(app.static_folder, path)
     
-    # Everything else gets index.html for SPA routing
     return send_from_directory(app.static_folder, 'index.html')
 
 if __name__ == '__main__':

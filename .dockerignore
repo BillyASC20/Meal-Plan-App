@@ -11,8 +11,4 @@ venv/
 *.log
 .git/
 .gitignore
-*.md
-
-
-# Models (will download during build)
-# backend/models/grounded_sam/*.pth
+node_modules/

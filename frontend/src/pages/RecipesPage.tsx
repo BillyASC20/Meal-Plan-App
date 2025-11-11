@@ -42,9 +42,9 @@ export const RecipesPage = () => {
         
         if (ingredientsToUse.length > 0) {
           setIsStreaming(true)
-          setRecipes([]) // Clear previous recipes
+          setRecipes([])
           let buffer = ''
-          let processedUpTo = 0 // Pointer tracking what we've already processed
+          let processedUpTo = 0
           const parsedRecipes: Recipe[] = []
           
           try {
@@ -108,7 +108,7 @@ export const RecipesPage = () => {
                               Array.isArray(recipe.steps) && recipe.steps.length > 0) {
                             
                             parsedRecipes.push(recipe)
-                            setRecipes([...parsedRecipes]) // Update UI immediately!
+                            setRecipes([...parsedRecipes])
                             console.log(`✨ Recipe #${parsedRecipes.length}: "${recipe.title}"`)
                             
                             processedUpTo = pos + 1
@@ -118,24 +118,20 @@ export const RecipesPage = () => {
                         }
                         objectStart = -1
                       }
-                    } else if (char === '[' || char === ']') {
-                      depth += (char === '[' ? 1 : -1)
-                      
-                      if (char === ']' && depth < 0) {
-                        break
-                      }
                     }
                   }
                   
                   pos++
                 }
                 
-                if (processedUpTo > 100) { // Keep some overlap for safety
+                if (processedUpTo > 100) {
                   buffer = buffer.slice(processedUpTo - 50)
                   processedUpTo = 50
                 }
               }
             }
+            
+            console.log(`🔍 Stream ended. Processing remaining buffer (${buffer.length} chars)...`)
             
             const cleanJson = buffer.trim()
               .replace(/^```json\n?/, '')
@@ -143,22 +139,26 @@ export const RecipesPage = () => {
               .replace(/\n?```$/, '')
               .trim()
             
+            console.log(`🔍 Clean buffer for final parse: ${cleanJson.substring(0, 200)}...`)
+            
             let finalRecipes = parsedRecipes
             try {
               const data = JSON.parse(cleanJson)
               if (data.recipes && Array.isArray(data.recipes) && data.recipes.length > parsedRecipes.length) {
-                console.log(`Final parse found ${data.recipes.length} total recipes`)
+                console.log(`✅ Final parse found ${data.recipes.length} total recipes (was ${parsedRecipes.length})`)
                 finalRecipes = data.recipes
                 setRecipes(finalRecipes)
+              } else {
+                console.log(`ℹ️ Final parse had ${data.recipes?.length || 0} recipes, keeping ${parsedRecipes.length} from incremental parsing`)
               }
-            } catch {
+            } catch (e) {
+              console.log(`⚠️ Final parse failed: ${e}. Using ${parsedRecipes.length} incrementally parsed recipes`)
               if (parsedRecipes.length > 0) {
-                console.log(`Stream ended with ${parsedRecipes.length} parsed recipes`)
                 finalRecipes = parsedRecipes
               }
             }
             
-            console.log('✅ Stream complete - backend saved recipes automatically')
+            console.log(`✅ Stream complete - ${finalRecipes.length} recipes total`)
             
           } catch (err: any) {
             console.error('Stream error:', err)

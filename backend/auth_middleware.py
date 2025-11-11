@@ -1,8 +1,3 @@
-"""
-Supabase authentication middleware for Flask.
-Verifies JWT tokens from Supabase on protected routes.
-"""
-
 from functools import wraps
 from flask import request, jsonify
 import os
@@ -18,10 +13,6 @@ _jwt_secret: Optional[str] = None
 
 
 def get_jwt_secret() -> str:
-    """
-    Fetch the JWT secret from Supabase.
-    In production, this should be cached and refreshed periodically.
-    """
     global _jwt_secret
     
     if _jwt_secret:
@@ -39,15 +30,6 @@ def get_jwt_secret() -> str:
 
 
 def verify_token(token: str) -> Optional[Dict[str, Any]]:
-    """
-    Verify a Supabase JWT token by calling Supabase API.
-    
-    Args:
-        token: The JWT token from the Authorization header
-        
-    Returns:
-        Decoded token payload if valid, None otherwise
-    """
     try:
         from supabase import create_client
         
@@ -76,15 +58,6 @@ def verify_token(token: str) -> Optional[Dict[str, Any]]:
 
 
 def require_auth(f):
-    """
-    Decorator to protect routes that require authentication.
-    
-    Usage:
-        @app.route('/protected')
-        @require_auth
-        def protected_route():
-            return jsonify({'user': g.user})
-    """
     @wraps(f)
     def decorated_function(*args, **kwargs):
         auth_header = request.headers.get('Authorization', '')
@@ -112,19 +85,6 @@ def require_auth(f):
 
 
 def optional_auth(f):
-    """
-    Decorator for routes that work with or without authentication.
-    If token is present and valid, user info is available in g.user.
-    
-    Usage:
-        @app.route('/optional')
-        @optional_auth
-        def optional_route():
-            from flask import g
-            if hasattr(g, 'user'):
-                return jsonify({'message': f'Hello {g.user["email"]}'})
-            return jsonify({'message': 'Hello guest'})
-    """
     @wraps(f)
     def decorated_function(*args, **kwargs):
         auth_header = request.headers.get('Authorization', '')

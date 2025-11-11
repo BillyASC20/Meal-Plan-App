@@ -1,6 +1,3 @@
-"""
-Quick script to get your user_id from Supabase for testing
-"""
 import sys
 import os
 

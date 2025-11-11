@@ -2,6 +2,7 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
+# Install system dependencies
 RUN apt-get update && apt-get install -y \
     git \
     build-essential \
@@ -10,24 +11,19 @@ RUN apt-get update && apt-get install -y \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
+# Install Node.js for frontend build
 RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
     && apt-get install -y nodejs \
     && rm -rf /var/lib/apt/lists/*
 
+# Install Python dependencies
 COPY backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-RUN pip install --no-cache-dir git+https://github.com/IDEA-Research/GroundingDINO.git
-RUN pip install --no-cache-dir git+https://github.com/facebookresearch/segment-anything.git
-
+# Copy backend code
 COPY backend/ .
 
-RUN mkdir -p models/grounded_sam
-
-RUN python -c "import urllib.request; \
-    urllib.request.urlretrieve('https://github.com/IDEA-Research/GroundingDINO/releases/download/v0.1.0-alpha/groundingdino_swint_ogc.pth', 'models/grounded_sam/groundingdino_swint_ogc.pth'); \
-    urllib.request.urlretrieve('https://dl.fbaipublicfiles.com/segment_anything/sam_vit_b_01ec64.pth', 'models/grounded_sam/sam_vit_b_01ec64.pth')"
-
+# Build frontend
 COPY frontend/package*.json ./frontend/
 WORKDIR /app/frontend
 RUN npm ci
@@ -35,6 +31,7 @@ RUN npm ci
 COPY frontend/ .
 RUN VITE_API_URL='' npm run build
 
+# Move built frontend to static folder
 WORKDIR /app
 RUN mv frontend/dist static
 

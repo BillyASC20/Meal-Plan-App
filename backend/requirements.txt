@@ -7,12 +7,7 @@ PyJWT==2.8.0
 requests==2.31.0
 supabase==2.9.0
 
-# YOLOv8 removed - using Grounded-SAM instead
-
-# Computer Vision - Grounded-SAM (new)
+# YOLOv8 for food detection
 pillow==10.1.0
-opencv-python==4.8.1.78
-torch>=2.0.0
-torchvision>=0.15.0
 numpy<2.0.0
-# Note: Install GroundingDINO and segment-anything separately (see GROUNDED_SAM_SETUP.md)
+ultralytics>=8.0.0
