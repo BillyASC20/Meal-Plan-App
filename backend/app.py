@@ -1,6 +1,7 @@
 import os
 import base64
 import json
+import sys
 from flask import Flask, jsonify, request, Response, send_from_directory
 from flask_cors import CORS
 from dotenv import load_dotenv
@@ -19,6 +20,16 @@ try:
 except Exception as e:
     print(f"[app] ❌ Failed to load YOLO detector: {e}")
     vision_service = None
+
+# Initialize health risk service
+health_service = None
+try:
+    from ml_pipeline.health_risk_service import get_health_risk_service
+    health_service = get_health_risk_service()
+    print("[app] ✅ Health risk classifier loaded")
+except Exception as e:
+    print(f"[app] ⚠️  Health risk classifier not available: {e}")
+    health_service = None
 
 app = Flask(__name__, static_folder='static', static_url_path='/static')
 CORS(app, resources={r"/*": {"origins": "*"}})
@@ -292,17 +303,38 @@ def generate_recipes_stream():
                             print(f"[stream] Created search record: {search_id}")
                             
                             recipes_to_insert = []
-                            for recipe in recipes:
-                                recipes_to_insert.append({
+                            for idx, recipe in enumerate(recipes):
+                                recipe_data = {
                                     'search_id': search_id,
                                     'title': recipe.get('title'),
                                     'ingredients': recipe.get('ingredients'),
                                     'steps': recipe.get('steps'),
                                     'cooking_time': recipe.get('cookingTime') or recipe.get('cook_time'),
                                     'difficulty': recipe.get('difficulty'),
-                                    'servings': str(recipe.get('servings', '')),
-                                    'calories': recipe.get('calories')
-                                })
+                                    'servings': str(recipe.get('servings', ''))
+                                }
+                                
+                                # Analyze health risks
+                                if health_service:
+                                    try:
+                                        recipe_ingredients = recipe.get('ingredients', [])
+                                        ingredient_names = []
+                                        if isinstance(recipe_ingredients, list):
+                                            for ing in recipe_ingredients:
+                                                if isinstance(ing, str):
+                                                    ingredient_names.append(ing)
+                                                elif isinstance(ing, dict) and 'name' in ing:
+                                                    ingredient_names.append(ing['name'])
+                                        
+                                        if ingredient_names:
+                                            health_analysis = health_service.get_risk_summary(ingredient_names)
+                                            recipe_data['health_risks'] = health_analysis
+                                            print(f"[stream] Recipe {idx + 1} risk: {health_analysis.get('overall_risk')}")
+                                    except Exception as e:
+                                        print(f"[stream] Health analysis failed for recipe {idx + 1}: {e}")
+                                        recipe_data['health_risks'] = None
+                                
+                                recipes_to_insert.append(recipe_data)
                             
                             print(f"[stream] Inserting {len(recipes_to_insert)} recipes...")
                             supabase.table('recipes').insert(recipes_to_insert).execute()
@@ -510,25 +542,12 @@ def auth_reset_password():
             parsed = urlparse(request_referer)
             if parsed.scheme and parsed.netloc:
                 request_origin = f"{parsed.scheme}://{parsed.netloc}"
-
-        forwarded_proto = request.headers.get('X-Forwarded-Proto')
-        forwarded_host = request.headers.get('X-Forwarded-Host')
-        forwarded_port = request.headers.get('X-Forwarded-Port')
-        forwarded_url = None
-        if forwarded_host:
-            scheme = forwarded_proto or 'https'
-            host_value = forwarded_host
-            if forwarded_port and forwarded_port not in ('80', '443') and ':' not in host_value:
-                host_value = f"{host_value}:{forwarded_port}"
-            forwarded_url = f"{scheme}://{host_value}"
-
-        fallback_host = (forwarded_url or (request.host_url.rstrip('/') if request.host_url else None) or 'http://localhost:5001')
+        fallback_host = request.host_url.rstrip('/') if request.host_url else 'http://localhost:5001'
         frontend_url = (configured_frontend or request_origin or fallback_host).rstrip('/')
         redirect_to = f"{frontend_url}/reset-password"
         print(f"[reset-password] Email: {email}")
         print(f"[reset-password] Origin header: {request.headers.get('Origin')}")
         print(f"[reset-password] Referer header: {request.headers.get('Referer')}")
-        print(f"[reset-password] X-Forwarded headers: proto={forwarded_proto}, host={forwarded_host}, port={forwarded_port}")
         print(f"[reset-password] Final redirect URL: {redirect_to}")
         
         supabase.auth.reset_password_for_email(
@@ -794,16 +813,49 @@ def save_recipes():
         
         recipes_to_insert = []
         for recipe in recipes:
-            recipes_to_insert.append({
+            recipe_data = {
                 'search_id': search_id,
                 'title': recipe.get('title'),
                 'ingredients': recipe.get('ingredients'),
                 'steps': recipe.get('steps'),
                 'cooking_time': recipe.get('cookingTime'),
                 'difficulty': recipe.get('difficulty'),
-                'servings': recipe.get('servings'),
-                'calories': recipe.get('calories')
-            })
+                'servings': recipe.get('servings')
+            }
+            
+            # Analyze health risks if service is available
+            if health_service:
+                try:
+                    # Extract ingredient names from the recipe
+                    ingredient_list = recipe.get('ingredients', [])
+                    if isinstance(ingredient_list, list):
+                        # Handle both string arrays and object arrays
+                        ingredient_names = []
+                        for ing in ingredient_list:
+                            if isinstance(ing, str):
+                                ingredient_names.append(ing)
+                            elif isinstance(ing, dict) and 'name' in ing:
+                                ingredient_names.append(ing['name'])
+                        
+                        # Get health risk analysis
+                        health_analysis = health_service.get_risk_summary(ingredient_names)
+                        
+                        # Store as JSONB
+                        recipe_data['health_risks'] = {
+                            'overall_risk': health_analysis.get('overall_risk'),
+                            'warnings': health_analysis.get('warnings', []),
+                            'risk_factors': health_analysis.get('risk_factors', {}),
+                            'high_risk_count': health_analysis.get('high_risk_count', 0)
+                        }
+                        
+                        print(f"[save] Health analysis for '{recipe.get('title')}': {health_analysis.get('overall_risk')}")
+                except Exception as e:
+                    print(f"[save] ⚠️  Health analysis failed: {e}")
+                    recipe_data['health_risks'] = None
+            else:
+                recipe_data['health_risks'] = None
+            
+            recipes_to_insert.append(recipe_data)
         
         supabase.table('recipes').insert(recipes_to_insert).execute()
         

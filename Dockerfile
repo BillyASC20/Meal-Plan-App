@@ -23,6 +23,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy backend code
 COPY backend/ .
 
+# Copy pre-trained ML models and inference code (training done separately)
+COPY backend/ml_models/ ./ml_models/
+COPY backend/ml_pipeline/ ./ml_pipeline/
+
 # Build frontend
 COPY frontend/package*.json ./frontend/
 WORKDIR /app/frontend

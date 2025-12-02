@@ -11,3 +11,8 @@ supabase==2.9.0
 pillow==10.1.0
 numpy<2.0.0
 ultralytics>=8.0.0
+
+# ML health risk classifier
+scikit-learn>=1.3.0
+joblib>=1.3.0
+pandas>=2.0.0
