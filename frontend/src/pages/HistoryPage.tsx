@@ -9,6 +9,27 @@ import './RecipesPage.css'
 
 const BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:5001'
 
+interface HealthRisks {
+  overall_risk: string
+  warnings: string[]
+  risk_factors: {
+    cholesterol?: number
+    heart_disease?: number
+    diabetes?: number
+    hypertension?: number
+    obesity?: number
+  }
+  high_risk_count: number
+  total_ingredients?: number
+  ingredient_details?: Array<{
+    name: string
+    risk_level: string
+    is_high_risk: boolean
+    risk_types: string[]
+    confidence: number
+  }>
+}
+
 interface RecipeSearch {
   id: string
   image_url: string
@@ -22,6 +43,7 @@ interface RecipeSearch {
     difficulty?: string
     servings?: string
     calories?: string
+    health_risks?: HealthRisks | null
   }>
 }
 
@@ -348,6 +370,190 @@ export const HistoryPage = () => {
                     >
                       {search.recipes.map((recipe, recipeIdx) => (
                         <div key={recipeIdx} style={{ marginBottom: '16px' }}>
+                          {recipe.health_risks && (
+                            <motion.div
+                              initial={{ opacity: 0, y: -10 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              style={{
+                                background: recipe.health_risks.overall_risk.toUpperCase() === 'HIGH' 
+                                  ? 'rgba(255, 107, 107, 0.15)'
+                                  : recipe.health_risks.overall_risk.toUpperCase() === 'MEDIUM'
+                                  ? 'rgba(255, 193, 7, 0.15)'
+                                  : 'rgba(76, 175, 80, 0.15)',
+                                border: `1px solid ${recipe.health_risks.overall_risk.toUpperCase() === 'HIGH' 
+                                  ? 'rgba(255, 107, 107, 0.4)'
+                                  : recipe.health_risks.overall_risk.toUpperCase() === 'MEDIUM'
+                                  ? 'rgba(255, 193, 7, 0.4)'
+                                  : 'rgba(76, 175, 80, 0.4)'}`,
+                                borderRadius: '12px',
+                                padding: '12px 16px',
+                                marginBottom: '12px',
+                                backdropFilter: 'blur(10px)'
+                              }}
+                            >
+                              <div style={{ 
+                                display: 'flex', 
+                                alignItems: 'center', 
+                                gap: '8px',
+                                marginBottom: '8px'
+                              }}>
+                                <span style={{ fontSize: '16px' }}>
+                                  {recipe.health_risks.overall_risk.toUpperCase() === 'HIGH' ? '🔴' : 
+                                   recipe.health_risks.overall_risk.toUpperCase() === 'MEDIUM' ? '🟡' : '🟢'}
+                                </span>
+                                <span style={{ 
+                                  fontWeight: '600',
+                                  fontSize: '13px',
+                                  textTransform: 'uppercase',
+                                  letterSpacing: '0.5px',
+                                  color: recipe.health_risks.overall_risk.toUpperCase() === 'HIGH' 
+                                    ? '#ff6b6b'
+                                    : recipe.health_risks.overall_risk.toUpperCase() === 'MEDIUM'
+                                    ? '#ffc107'
+                                    : '#4caf50'
+                                }}>
+                                  {recipe.health_risks.overall_risk.toUpperCase()} RISK
+                                </span>
+                                <span style={{
+                                  fontSize: '11px',
+                                  color: 'rgba(255, 255, 255, 0.6)',
+                                  marginLeft: 'auto'
+                                }}>
+                                  {recipe.health_risks.high_risk_count}/{recipe.health_risks.total_ingredients} high-risk
+                                </span>
+                              </div>
+                              
+                              {/* Risk Factors Bar */}
+                              {recipe.health_risks.risk_factors && Object.entries(recipe.health_risks.risk_factors).some(([_, v]) => v > 0) && (
+                                <div style={{ 
+                                  marginTop: '8px',
+                                  padding: '8px',
+                                  background: 'rgba(0, 0, 0, 0.2)',
+                                  borderRadius: '6px'
+                                }}>
+                                  <div style={{ 
+                                    fontSize: '10px', 
+                                    fontWeight: '600',
+                                    color: 'rgba(255, 255, 255, 0.5)',
+                                    marginBottom: '6px',
+                                    textTransform: 'uppercase',
+                                    letterSpacing: '0.5px'
+                                  }}>
+                                    Risk Factors
+                                  </div>
+                                  {Object.entries(recipe.health_risks.risk_factors).map(([factor, percentage]) => {
+                                    if (percentage === 0) return null;
+                                    const factorIcons = {
+                                      cholesterol: '🥚',
+                                      heart_disease: '❤️',
+                                      diabetes: '🩺',
+                                      hypertension: '🧂',
+                                      obesity: '⚖️'
+                                    };
+                                    return (
+                                      <div key={factor} style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '8px',
+                                        marginBottom: '4px'
+                                      }}>
+                                        <span style={{ fontSize: '12px' }}>{factorIcons[factor as keyof typeof factorIcons]}</span>
+                                        <span style={{
+                                          fontSize: '11px',
+                                          color: 'rgba(255, 255, 255, 0.8)',
+                                          flex: 1,
+                                          textTransform: 'capitalize'
+                                        }}>
+                                          {factor.replace('_', ' ')}
+                                        </span>
+                                        <span style={{
+                                          fontSize: '11px',
+                                          fontWeight: '600',
+                                          color: percentage >= 50 ? '#ff6b6b' : percentage >= 25 ? '#ffc107' : '#4caf50'
+                                        }}>
+                                          {percentage.toFixed(0)}%
+                                        </span>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                              
+                              {/* Individual Ingredient Breakdown */}
+                              {recipe.health_risks.ingredient_details && recipe.health_risks.ingredient_details.length > 0 && (
+                                <div style={{ 
+                                  marginTop: '8px',
+                                  padding: '8px',
+                                  background: 'rgba(0, 0, 0, 0.2)',
+                                  borderRadius: '6px'
+                                }}>
+                                  <div style={{ 
+                                    fontSize: '10px', 
+                                    fontWeight: '600',
+                                    color: 'rgba(255, 255, 255, 0.5)',
+                                    marginBottom: '6px',
+                                    textTransform: 'uppercase',
+                                    letterSpacing: '0.5px'
+                                  }}>
+                                    Ingredient Analysis
+                                  </div>
+                                  {recipe.health_risks.ingredient_details.map((ing, idx) => (
+                                    <div key={idx} style={{
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '8px',
+                                      marginBottom: '4px',
+                                      padding: '4px',
+                                      background: ing.is_high_risk ? 'rgba(255, 107, 107, 0.1)' : 'transparent',
+                                      borderRadius: '4px'
+                                    }}>
+                                      <span style={{ fontSize: '12px' }}>
+                                        {ing.risk_level === 'very_high' || ing.risk_level === 'high' ? '🔴' :
+                                         ing.risk_level === 'moderate' ? '🟡' : '🟢'}
+                                      </span>
+                                      <span style={{
+                                        fontSize: '11px',
+                                        color: 'rgba(255, 255, 255, 0.9)',
+                                        flex: 1,
+                                        fontWeight: ing.is_high_risk ? '600' : '400'
+                                      }}>
+                                        {ing.name}
+                                      </span>
+                                      {ing.risk_types.length > 0 && (
+                                        <span style={{
+                                          fontSize: '9px',
+                                          color: 'rgba(255, 255, 255, 0.6)',
+                                          fontStyle: 'italic'
+                                        }}>
+                                          {ing.risk_types.join(', ')}
+                                        </span>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                              
+                              {/* Warnings */}
+                              {recipe.health_risks.warnings && recipe.health_risks.warnings.length > 0 && (
+                                <div style={{ marginTop: '8px' }}>
+                                  {recipe.health_risks.warnings.map((warning, wIdx) => (
+                                    <div 
+                                      key={wIdx}
+                                      style={{
+                                        fontSize: '12px',
+                                        color: 'rgba(255, 255, 255, 0.9)',
+                                        lineHeight: '1.5',
+                                        paddingLeft: '24px',
+                                        marginTop: wIdx > 0 ? '4px' : '0'
+                                      }}
+                                    >
+                                      {warning}
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </motion.div>
+                          )}
                           <RecipeCard recipe={{
                             title: recipe.title,
                             meal_type: '',

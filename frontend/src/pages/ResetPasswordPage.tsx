@@ -6,6 +6,20 @@ import './AuthPages.css'
 
 const BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:5001'
 
+function setTokensAndNotify(accessToken: string, refreshToken: string | null) {
+  localStorage.setItem('access_token', accessToken)
+  if (refreshToken) {
+    localStorage.setItem('refresh_token', refreshToken)
+  }
+  // Set default expiry (1 hour)
+  const defaultExpiresAt = Date.now() + (3600 * 1000)
+  localStorage.setItem('token_expires_at', defaultExpiresAt.toString())
+  
+  // Notify navbar and other components
+  window.dispatchEvent(new CustomEvent('auth-changed'))
+  window.dispatchEvent(new Event('storage'))
+}
+
 export const ResetPasswordPage = () => {
   const navigate = useNavigate()
   const [password, setPassword] = useState('')
@@ -71,10 +85,15 @@ export const ResetPasswordPage = () => {
         throw new Error(data.message || 'Failed to update password')
       }
 
+      // Store the tokens and notify navbar
+      if (accessToken) {
+        setTokensAndNotify(accessToken, refreshToken)
+      }
+
       setSuccess(true)
       
       setTimeout(() => {
-        navigate('/login')
+        navigate('/camera')
       }, 2000)
 
     } catch (err: any) {
