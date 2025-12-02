@@ -17,7 +17,7 @@ export const RecipesPage = () => {
   const [isStreaming, setIsStreaming] = useState(false)
   const [showAuthModal, setShowAuthModal] = useState(false)
   const previousRecipeCount = useRef(0)
-  const hasStartedStreaming = useRef(false) // Prevent duplicate requests
+  const hasStartedStreaming = useRef(false)
 
   useEffect(() => {
     const fetchRecipes = async () => {
@@ -46,10 +46,14 @@ export const RecipesPage = () => {
           let buffer = ''
           let processedUpTo = 0
           const parsedRecipes: Recipe[] = []
+          let lastChunkTime = Date.now()
+          let backendStreamClosed = false
           
           try {
+            console.log('🚀 Starting to receive chunks from backend...')
             for await (const chunk of api.generateRecipesStream(ingredientsToUse, imageUrlFromState || undefined)) {
               buffer += chunk
+              lastChunkTime = Date.now()
               
               const cleanBuffer = buffer.trim()
                 .replace(/^```json\n?/, '')
@@ -124,41 +128,82 @@ export const RecipesPage = () => {
                   pos++
                 }
                 
-                if (processedUpTo > 100) {
-                  buffer = buffer.slice(processedUpTo - 50)
-                  processedUpTo = 50
-                }
               }
             }
             
-            console.log(`🔍 Stream ended. Processing remaining buffer (${buffer.length} chars)...`)
+            backendStreamClosed = true
+            const timeSinceLastChunk = Date.now() - lastChunkTime
+            console.log(`✅ CONDITION 1: Backend stream closed. Last chunk was ${timeSinceLastChunk}ms ago`)
+            console.log('⏳ Now frontend will process buffer and decide when to stop animation...')
+            if (!backendStreamClosed) {
+              console.error('❌ Stream should be closed but flag not set!')
+            }
+            console.log('⏳ Waiting 1000ms to ensure all data received...')
+            await new Promise(resolve => setTimeout(resolve, 1000))
             
-            const cleanJson = buffer.trim()
+            console.log(`🔍 Processing remaining buffer (${buffer.length} chars)...`)
+            console.log(`🔍 Currently have ${parsedRecipes.length} recipes from incremental parsing`)
+            
+            let cleanJson = buffer
               .replace(/^```json\n?/, '')
               .replace(/^```\n?/, '')
               .replace(/\n?```$/, '')
               .trim()
+
+            const firstBrace = cleanJson.indexOf('{')
+            if (firstBrace > 0) {
+              cleanJson = cleanJson.slice(firstBrace)
+            }
+
+            if (!cleanJson.endsWith(']}')) {
+              if (!cleanJson.endsWith(']')) {
+                cleanJson = `${cleanJson}]`
+              }
+              if (!cleanJson.endsWith(']}')) {
+                cleanJson = `${cleanJson}}`
+              }
+            }
             
             console.log(`🔍 Clean buffer for final parse: ${cleanJson.substring(0, 200)}...`)
             
             let finalRecipes = parsedRecipes
+            let foundNewRecipes = false
+            
             try {
               const data = JSON.parse(cleanJson)
-              if (data.recipes && Array.isArray(data.recipes) && data.recipes.length > parsedRecipes.length) {
-                console.log(`✅ Final parse found ${data.recipes.length} total recipes (was ${parsedRecipes.length})`)
-                finalRecipes = data.recipes
-                setRecipes(finalRecipes)
-              } else {
-                console.log(`ℹ️ Final parse had ${data.recipes?.length || 0} recipes, keeping ${parsedRecipes.length} from incremental parsing`)
+              if (data.recipes && Array.isArray(data.recipes)) {
+                const validRecipes = data.recipes.filter((r: any) => 
+                  r.title && 
+                  Array.isArray(r.ingredients) && r.ingredients.length > 0 &&
+                  Array.isArray(r.steps) && r.steps.length > 0
+                )
+                
+                if (validRecipes.length > parsedRecipes.length) {
+                  console.log(`✅ Final parse found ${validRecipes.length} total recipes (was ${parsedRecipes.length})`)
+                  finalRecipes = validRecipes
+                  foundNewRecipes = true
+                  setRecipes(validRecipes)
+                } else {
+                  console.log(`ℹ️ Final parse had ${validRecipes.length} recipes, keeping ${parsedRecipes.length} from incremental parsing`)
+                  finalRecipes = parsedRecipes
+                }
               }
             } catch (e) {
               console.log(`⚠️ Final parse failed: ${e}. Using ${parsedRecipes.length} incrementally parsed recipes`)
-              if (parsedRecipes.length > 0) {
-                finalRecipes = parsedRecipes
-              }
+              finalRecipes = parsedRecipes
             }
             
-            console.log(`✅ Stream complete - ${finalRecipes.length} recipes total`)
+            if (foundNewRecipes) {
+              console.log('⏳ Waiting 800ms for new recipes to animate in...')
+              await new Promise(resolve => setTimeout(resolve, 800))
+            }
+            
+            console.log('⏳ Final 400ms buffer before closing animation...')
+            await new Promise(resolve => setTimeout(resolve, 400))
+            
+            console.log(`✅ CONDITION 2: Frontend processing complete - ${finalRecipes.length} recipes displayed.`)
+            console.log('🎬 Both conditions met (backend closed + frontend processed). Stopping animation.')
+            setIsStreaming(false)
             
           } catch (err: any) {
             console.error('Stream error:', err)
@@ -170,7 +215,6 @@ export const RecipesPage = () => {
             const result = await api.generateRecipes(ingredientsToUse)
             const fallbackRecipes = result.recipes || []
             setRecipes(fallbackRecipes)
-          } finally {
             setIsStreaming(false)
           }
         } else {
@@ -287,7 +331,6 @@ export const RecipesPage = () => {
         )}
       </div>
 
-      {/* Authentication Required Modal */}
       {showAuthModal && (
         <div
           style={{

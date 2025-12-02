@@ -47,9 +47,11 @@ def detect_ingredients():
             return jsonify({"status": "error", "message": "Vision service unavailable"}), 500
         result = vision_service.detect_and_draw_boxes(image_data, topk=25)
         preds = result['detections']
+        suggestions = result.get('suggestions', [])
         image_with_boxes = result['image_with_boxes']
         
-        print(f"[detect] Got {len(preds)} predictions from vision service")
+        print(f"[detect] Got {len(preds)} high-confidence predictions from vision service")
+        print(f"[detect] Got {len(suggestions)} low-confidence suggestions from vision service")
         print(f"[detect] Image with boxes length: {len(image_with_boxes) if image_with_boxes else 0}")
         
         if isinstance(preds, list) and len(preds) > 0:
@@ -65,18 +67,28 @@ def detect_ingredients():
             ingredients = []
 
         message = None
-        if not ingredients:
+        if not ingredients and not suggestions:
             message = "nothing_detected"
             print("[detect] ⚠️  No ingredients detected!")
         else:
-            print(f"[detect] ✅ Returning {len(ingredients)} ingredients: {ingredients[:5]}")
+            print(f"[detect] ✅ Returning {len(ingredients)} ingredients + {len(suggestions)} suggestions: {ingredients[:5]}")
 
         formatted_predictions = []
         for pred in preds:
             if isinstance(pred, dict):
                 formatted_predictions.append({
                     "name": pred.get("label") or pred.get("name", "unknown"),
-                    "confidence": pred.get("confidence", 0.0)
+                    "confidence": pred.get("confidence", 0.0),
+                    "bbox": pred.get("bbox", [])
+                })
+        
+        formatted_suggestions = []
+        for sug in suggestions:
+            if isinstance(sug, dict):
+                formatted_suggestions.append({
+                    "name": sug.get("label") or sug.get("name", "unknown"),
+                    "confidence": sug.get("confidence", 0.0),
+                    "bbox": sug.get("bbox", [])
                 })
 
         return jsonify({
@@ -84,6 +96,7 @@ def detect_ingredients():
             "data": {
                 "ingredients": ingredients,
                 "predictions": formatted_predictions,
+                "suggestions": formatted_suggestions,
                 "image_with_boxes": image_with_boxes,
                 **({"message": message} if message else {})
             }
@@ -131,6 +144,60 @@ def generate_recipes():
             "message": str(e)
         }), 500
 
+@app.route('/create-final-image', methods=['POST'])
+@require_auth
+def create_final_image():
+    """Create final image with selected ingredient boxes for recipe generation"""
+    try:
+        data = request.get_json()
+        if not data or 'image' not in data:
+            return jsonify({"status": "error", "message": "No image data provided"}), 400
+        
+        image_data = data['image']
+        high_conf_coords = data.get('high_confidence', [])  # Always include these (green)
+        low_conf_coords = data.get('low_confidence', [])    # Optional selected ones (yellow)
+        
+        print(f"[final-image] Drawing {len(high_conf_coords)} green boxes + {len(low_conf_coords)} yellow boxes")
+        
+        if vision_service is None:
+            return jsonify({"status": "error", "message": "Vision service unavailable"}), 500
+        
+        from PIL import Image
+        import base64
+        import io
+        
+        # Decode original image
+        if image_data.startswith('data:image'):
+            image_data = image_data.split(',')[1]
+        
+        image_bytes = base64.b64decode(image_data)
+        image = Image.open(io.BytesIO(image_bytes))
+        
+        # Combine coordinates: high confidence first (for drawing order)
+        all_items_to_draw = high_conf_coords + low_conf_coords
+        
+        print(f"[final-image] Total items to draw: {len(all_items_to_draw)}")
+        
+        # Draw boxes with threshold 0.35 (determines green vs yellow color)
+        image_with_boxes = vision_service._draw_boxes(image, all_items_to_draw, high_thresh=0.35)
+        image_data_url = vision_service._image_to_data_url(image_with_boxes)
+        
+        print(f"[final-image] Successfully drew boxes")
+        
+        return jsonify({
+            "status": "success",
+            "image_with_boxes": image_data_url
+        })
+    
+    except Exception as e:
+        print(f"[final-image] Error: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            "status": "error", 
+            "message": str(e)
+        }), 500
+
 @app.route('/generate-recipes-stream', methods=['POST'])
 @require_auth
 def generate_recipes_stream():
@@ -145,6 +212,10 @@ def generate_recipes_stream():
         
         ingredients = data['ingredients']
         image_url = data.get('image_url')
+        
+        print(f"[stream] Received request:")
+        print(f"[stream]   - Ingredients: {ingredients}")
+        print(f"[stream]   - Image URL: {image_url}")
         
         auth_header = request.headers.get('Authorization')
         user_id = None
@@ -168,12 +239,14 @@ def generate_recipes_stream():
             full_content = ""
             chunk_count = 0
             try:
+                print(f"[stream] Starting OpenAI stream for {len(ingredients)} ingredients...")
                 for chunk in recipe_gen.openai_service.generate_recipes_stream(ingredients):
                     full_content += chunk
                     chunk_count += 1
                     yield f"data: {json.dumps({'chunk': chunk})}\n\n"
                 
                 print(f"[stream] OpenAI streaming complete. Sent {chunk_count} chunks, total length: {len(full_content)}")
+                # Frontend will decide when animation stops based on parsing completion
                 
             except Exception as e:
                 print(f"[stream] ❌ Error during streaming: {e}")
@@ -429,7 +502,19 @@ def auth_reset_password():
                 "message": "Email required"
             }), 400
         
-        supabase.auth.reset_password_for_email(email)
+        # Determine frontend URL for redirect dynamically
+        configured_frontend = os.getenv('FRONTEND_URL')
+        request_origin = request.headers.get('Origin')
+        fallback_host = request.host_url.rstrip('/') if request.host_url else 'http://localhost:5001'
+        frontend_url = (configured_frontend or request_origin or fallback_host).rstrip('/')
+        redirect_to = f"{frontend_url}/reset-password"
+        
+        supabase.auth.reset_password_for_email(
+            email,
+            options={
+                "redirect_to": redirect_to
+            }
+        )
         
         return jsonify({
             "status": "success",
@@ -441,6 +526,108 @@ def auth_reset_password():
             "status": "error",
             "message": str(e)
         }), 500
+
+@app.route('/auth/update-password', methods=['POST'])
+def auth_update_password():
+    try:
+        from supabase import create_client
+        
+        supabase_url = os.getenv('SUPABASE_URL')
+        supabase_key = os.getenv('SUPABASE_SERVICE_ROLE_KEY')
+        
+        if not supabase_url or not supabase_key:
+            return jsonify({
+                "status": "error",
+                "message": "Supabase not configured on server"
+            }), 500
+        
+        supabase = create_client(supabase_url, supabase_key)
+        
+        data = request.get_json()
+        password = data.get('password')
+        access_token = data.get('access_token')
+        refresh_token = data.get('refresh_token')
+        
+        if not password:
+            return jsonify({
+                "status": "error",
+                "message": "Password required"
+            }), 400
+        
+        if not access_token:
+            return jsonify({
+                "status": "error",
+                "message": "Access token required"
+            }), 400
+        
+        # Set the session using the tokens from the email link
+        supabase.auth.set_session(access_token, refresh_token or '')
+        
+        # Update the user's password
+        response = supabase.auth.update_user({
+            "password": password
+        })
+        
+        return jsonify({
+            "status": "success",
+            "message": "Password updated successfully"
+        })
+        
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "message": str(e)
+        }), 500
+
+@app.route('/auth/refresh', methods=['POST'])
+def auth_refresh():
+    try:
+        from supabase import create_client
+        
+        supabase_url = os.getenv('SUPABASE_URL')
+        supabase_key = os.getenv('SUPABASE_SERVICE_ROLE_KEY')
+        
+        if not supabase_url or not supabase_key:
+            return jsonify({
+                "status": "error",
+                "message": "Supabase not configured on server"
+            }), 500
+        
+        supabase = create_client(supabase_url, supabase_key)
+        
+        data = request.get_json()
+        refresh_token = data.get('refresh_token')
+        
+        if not refresh_token:
+            return jsonify({
+                "status": "error",
+                "message": "Refresh token required"
+            }), 400
+        
+        # Use refresh token to get new access token
+        response = supabase.auth.refresh_session(refresh_token)
+        
+        if not response or not response.session:
+            return jsonify({
+                "status": "error",
+                "message": "Failed to refresh session"
+            }), 401
+        
+        return jsonify({
+            "status": "success",
+            "data": {
+                "session": {
+                    "access_token": response.session.access_token,
+                    "refresh_token": response.session.refresh_token
+                }
+            }
+        })
+        
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "message": str(e)
+        }), 401
 
 
 @app.route('/api/upload-image', methods=['POST'])
@@ -483,6 +670,9 @@ def upload_image():
         data = request.get_json()
         image_data = data.get('image')
         
+        print(f"[upload-image] Received upload request from user: {user_id}")
+        print(f"[upload-image] Image data length: {len(image_data) if image_data else 0}")
+        
         if not image_data:
             return jsonify({
                 "status": "error",
@@ -503,7 +693,11 @@ def upload_image():
             file_options={"content-type": "image/jpeg"}
         )
         
+        print(f"[upload-image] Upload result: {result}")
+        
         public_url = supabase.storage.from_('Food Images').get_public_url(filename)
+        
+        print(f"[upload-image] ✅ Uploaded successfully: {public_url}")
         
         return jsonify({
             "status": "success",
@@ -514,6 +708,9 @@ def upload_image():
         })
         
     except Exception as e:
+        print(f"[upload-image] ❌ Error: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({
             "status": "error",
             "message": str(e)

@@ -34,14 +34,26 @@ class OpenAIService:
   ]
 }
 
-IMPORTANT REQUIREMENTS:
+CRITICAL JSON REQUIREMENTS FOR STREAMING:
+- Start IMMEDIATELY with { and "recipes": [
+- Each recipe must be a COMPLETE, VALID JSON object
+- Close each recipe object properly with }
+- Separate recipes with commas
+- End with ] } to close the structure
+- DO NOT include markdown code blocks (no ```json or ```)
+- DO NOT include any text before or after the JSON
+- Ensure all strings are properly escaped
+- Complete each recipe fully before starting the next one
+
+RECIPE CONTENT REQUIREMENTS:
 - Include PRECISE measurements in ingredients (cups, tbsp, oz, grams, etc.)
 - Include DETAILED cooking temperatures and times in steps
 - Make steps clear and specific (not just "mix ingredients")
 - Add helpful cooking tips in steps when relevant
 - Each step should be 1-2 sentences with actionable instructions
 - Use the provided ingredients creatively but realistically
-Return ONLY valid JSON. No markdown, no explanations."""
+
+Return ONLY valid JSON. Stream each complete recipe object as you generate it."""
 
     def __init__(self):
         api_key = os.getenv('OPENAI_API_KEY')

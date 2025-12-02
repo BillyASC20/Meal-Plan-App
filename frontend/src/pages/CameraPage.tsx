@@ -7,25 +7,58 @@ import Navbar from '../components/Navbar'
 import './CameraPage.css'
 import { api } from '../components/api'
 
+const ALLOWED_IMAGE_TYPES = new Set([
+  'image/jpeg',
+  'image/png'
+])
+
+const ALLOWED_IMAGE_EXTENSIONS = new Set(['jpg', 'jpeg', 'png'])
+
+const INVALID_FORMAT_MESSAGE = 'Only JPG or PNG images are supported.'
+
 export const CameraPage = () => {
   const navigate = useNavigate()
   const [isDetecting, setIsDetecting] = useState(false)
   const [detectedItems, setDetectedItems] = useState<string[]>([])
   const [uploadedImage, setUploadedImage] = useState<string | null>(null)
-  const [predictions, setPredictions] = useState<{name: string, confidence: number}[]>([])
-  const [hasDetected, setHasDetected] = useState(false) // Track if detection has been run
-  const [isDragging, setIsDragging] = useState(false) // Track drag state
-  const [showAuthModal, setShowAuthModal] = useState(false) // Track auth modal
+  const [originalImage, setOriginalImage] = useState<string | null>(null)
+  const [predictions, setPredictions] = useState<{name: string, confidence: number, bbox?: number[]}[]>([])
+  const [suggestions, setSuggestions] = useState<{name: string, confidence: number, bbox?: number[]}[]>([])
+  const [selectedSuggestions, setSelectedSuggestions] = useState<Set<string>>(new Set())
+  const [deselectedPredictions, setDeselectedPredictions] = useState<Set<string>>(new Set())
+  const [hasDetected, setHasDetected] = useState(false)
+  const [isGenerating, setIsGenerating] = useState(false)
+  const [isDragging, setIsDragging] = useState(false)
+  const [showAuthModal, setShowAuthModal] = useState(false)
+  const [imageKey, setImageKey] = useState(0)
+  const [uploadError, setUploadError] = useState('')
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const isAllowedFile = (file: File) => {
+    const mimeType = file.type?.toLowerCase()
+    if (mimeType && ALLOWED_IMAGE_TYPES.has(mimeType)) {
+      return true
+    }
+    const extension = file.name?.split('.').pop()?.toLowerCase()
+    return extension ? ALLOWED_IMAGE_EXTENSIONS.has(extension) : false
+  }
 
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (file) {
+      if (!isAllowedFile(file)) {
+        setUploadError(INVALID_FORMAT_MESSAGE)
+        event.target.value = ''
+        return
+      }
+      setUploadError('')
       const reader = new FileReader()
       reader.onloadend = () => {
-        setUploadedImage(reader.result as string)
-        setDetectedItems([]) // Clear previous detection
-        setHasDetected(false) // Reset detection state
+        const imageData = reader.result as string
+        setUploadedImage(imageData)
+        setOriginalImage(imageData)
+        setDetectedItems([])
+        setHasDetected(false)
         setPredictions([])
       }
       reader.readAsDataURL(file)
@@ -47,16 +80,26 @@ export const CameraPage = () => {
     setIsDragging(false)
     
     const file = e.dataTransfer.files?.[0]
-    if (file && file.type.startsWith('image/')) {
-      const reader = new FileReader()
-      reader.onloadend = () => {
-        setUploadedImage(reader.result as string)
-        setDetectedItems([])
-        setHasDetected(false)
-        setPredictions([])
-      }
-      reader.readAsDataURL(file)
+    if (!file) return
+    if (!file.type || !file.type.startsWith('image/')) {
+      setUploadError('Please drop an image file.')
+      return
     }
+    if (!isAllowedFile(file)) {
+      setUploadError(INVALID_FORMAT_MESSAGE)
+      return
+    }
+    setUploadError('')
+    const reader = new FileReader()
+    reader.onloadend = () => {
+      const imageData = reader.result as string
+      setUploadedImage(imageData)
+      setOriginalImage(imageData)
+      setDetectedItems([])
+      setHasDetected(false)
+      setPredictions([])
+    }
+    reader.readAsDataURL(file)
   }
 
   const triggerFileInput = () => {
@@ -66,22 +109,30 @@ export const CameraPage = () => {
   const detectIngredients = async () => {
     if (!uploadedImage) return
     setIsDetecting(true)
-    setHasDetected(true) // Mark that detection has been run
+    setHasDetected(true)
     try {
-      const result = await api.detectIngredients(uploadedImage)
+      const result = await api.detectIngredients(originalImage || uploadedImage)
+      
+      console.log('[CameraPage] Detection result:', result)
+      console.log('[CameraPage] Predictions (high conf):', result.predictions)
+      console.log('[CameraPage] Suggestions (low conf):', result.suggestions)
       
       setPredictions(result.predictions || [])
-      const allNames = (result.predictions || []).map(p => p.name)
-      
+      setSuggestions(result.suggestions || [])
+      setSelectedSuggestions(new Set())
+      setDeselectedPredictions(new Set())
+      const highConfNames = (result.predictions || []).map(p => p.name)
+      console.log('[CameraPage] High confidence item names:', highConfNames)
+      setDetectedItems(highConfNames)
       if (result.image_with_boxes) {
+        console.log('[CameraPage] Using image with all boxes from backend')
+        console.log('[CameraPage] Image data length:', result.image_with_boxes.length)
         setUploadedImage(result.image_with_boxes)
+        setImageKey(prev => prev + 1)
       }
       
-      if (allNames.length > 0) {
-        setDetectedItems(allNames)
-        sessionStorage.setItem('detectedIngredients', JSON.stringify(allNames))
-      } else {
-        setDetectedItems([]) // empty list -> UI will show nothing detected message
+      if (highConfNames.length > 0 || (result.suggestions || []).length > 0) {
+        sessionStorage.setItem('detectedIngredients', JSON.stringify(highConfNames))
       }
     } catch (err: any) {
       console.error('Error detecting ingredients:', err)
@@ -96,25 +147,52 @@ export const CameraPage = () => {
     }
   }
 
+  const toggleSuggestion = (name: string) => {
+    const newSelected = new Set(selectedSuggestions)
+    if (newSelected.has(name)) {
+      newSelected.delete(name)
+    } else {
+      newSelected.add(name)
+    }
+    setSelectedSuggestions(newSelected)
+    console.log('[CameraPage] Toggled suggestion:', name, 'Now selected:', Array.from(newSelected))
+  }
+
+  const togglePrediction = (name: string) => {
+    const newDeselected = new Set(deselectedPredictions)
+    if (newDeselected.has(name)) {
+      newDeselected.delete(name)
+    } else {
+      newDeselected.add(name)
+    }
+    setDeselectedPredictions(newDeselected)
+    console.log('[CameraPage] Toggled prediction:', name, 'Now deselected:', Array.from(newDeselected))
+  }
+
   const generateRecipes = async () => {
-    if (detectedItems.length > 0 && uploadedImage) {
+    const selectedPredictions = detectedItems.filter(name => !deselectedPredictions.has(name))
+    const selectedLowConf = Array.from(selectedSuggestions)
+    const allIngredients = [...selectedPredictions, ...selectedLowConf]
+    
+    if (allIngredients.length > 0 && uploadedImage) {
       try {
-        setIsDetecting(true)
+        setIsGenerating(true)
         
+        console.log('[CameraPage] Generating recipes with ingredients:', allIngredients)
         const imageUrl = await api.uploadImage(uploadedImage)
-        console.log('Image uploaded:', imageUrl)
+        console.log('[CameraPage] Image uploaded:', imageUrl)
         
         navigate('/recipes', { 
           state: { 
-            ingredients: detectedItems,
+            ingredients: allIngredients,
             imageUrl: imageUrl
           } 
         })
       } catch (err) {
         console.error('Error uploading image:', err)
-        navigate('/recipes', { state: { ingredients: detectedItems } })
+        navigate('/recipes', { state: { ingredients: allIngredients } })
       } finally {
-        setIsDetecting(false)
+        setIsGenerating(false)
       }
     } else {
       const saved = sessionStorage.getItem('detectedIngredients')
@@ -137,6 +215,11 @@ export const CameraPage = () => {
 
       <div className="camera-content">
         <GlassCard className="camera-container">
+          {uploadError && (
+            <div className="upload-error" role="alert">
+              {uploadError}
+            </div>
+          )}
           <div className="camera-view">
             {!uploadedImage ? (
               <motion.div 
@@ -165,7 +248,7 @@ export const CameraPage = () => {
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept="image/*"
+                  accept=".jpg,.jpeg,.png,image/jpeg,image/png"
                   capture="environment"
                   onChange={handleImageUpload}
                   style={{ display: 'none' }}
@@ -182,8 +265,11 @@ export const CameraPage = () => {
                 className="image-preview"
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
+                key={imageKey}
               >
-                <img src={uploadedImage} alt="Uploaded ingredients" className="uploaded-img" />
+                {uploadedImage && (
+                  <img src={uploadedImage} alt="Uploaded ingredients" className="uploaded-img" />
+                )}
                 <div className="image-overlay">
                   {!isDetecting && !hasDetected && (
                     <GlassButton 
@@ -198,7 +284,7 @@ export const CameraPage = () => {
             )}
           </div>
 
-          {isDetecting && (
+          {(isDetecting || isGenerating) && (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -207,12 +293,14 @@ export const CameraPage = () => {
               <div className="spinner-container">
                 <div className="gold-spinner"></div>
               </div>
-              <p className="detecting-text">Analyzing ingredients...</p>
+              <p className="detecting-text">
+                {isGenerating ? 'Preparing recipes...' : 'Analyzing ingredients...'}
+              </p>
             </motion.div>
           )}
         </GlassCard>
 
-        {hasDetected && detectedItems.length === 0 && !isDetecting && (
+        {hasDetected && detectedItems.length === 0 && suggestions.length === 0 && !isDetecting && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -227,47 +315,122 @@ export const CameraPage = () => {
           </motion.div>
         )}
 
-        {detectedItems.length > 0 && (
+        {(detectedItems.length > 0 || suggestions.length > 0) && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             className="detected-section"
           >
             <GlassCard>
-              <h2 className="detected-title">Detected Ingredients</h2>
-              <div className="detected-grid">
-                {detectedItems.map((item, idx) => (
-                  <motion.div
-                    key={item}
-                    className="detected-item"
-                    initial={{ opacity: 0, scale: 0.8 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ delay: idx * 0.1 }}
-                  >
-                    <div className="item-icon">
-                      <div className="ingredient-badge">
-                        {item.charAt(0).toUpperCase()}
-                      </div>
-                    </div>
-                    <span className="item-name">
-                      {item}
-                      {(() => {
-                        const p = predictions.find(pr => pr.name === item)
-                        return p ? `  ${(p.confidence*100).toFixed(1)}%` : ''
-                      })()}
-                    </span>
-                    <svg className="check-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M20 6L9 17L4 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              {detectedItems.length > 0 && (
+                <>
+                  <h2 className="detected-title">✅ High Confidence Ingredients</h2>
+                  <div className="detected-grid">
+                    {detectedItems.map((item, idx) => {
+                      const isSelected = !deselectedPredictions.has(item)
+                      return (
+                        <motion.div
+                          key={item}
+                          className={`detected-item ${isSelected ? 'selected' : 'unselected'}`}
+                          initial={{ opacity: 0, scale: 0.8 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          transition={{ delay: idx * 0.1 }}
+                          onClick={() => togglePrediction(item)}
+                          style={{ cursor: 'pointer' }}
+                        >
+                          <div className="item-icon">
+                            <div className="ingredient-badge">
+                              {item.charAt(0).toUpperCase()}
+                            </div>
+                          </div>
+                          <span className="item-name">
+                            {item}
+                            {(() => {
+                              const p = predictions.find(pr => pr.name === item)
+                              return p ? `  ${(p.confidence*100).toFixed(1)}%` : ''
+                            })()}
+                          </span>
+                          {isSelected && <span className="checkmark">✓</span>}
+                        </motion.div>
+                      )
+                    })}
+                  </div>
+                </>
+              )}
+
+              {/* Suggestions Section - Low Confidence Items */}
+              {suggestions.length > 0 && (
+                <div className="suggestions-section">
+                  <div className="suggestions-header">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <circle cx="12" cy="12" r="10" stroke="#F59E0B" strokeWidth="2"/>
+                      <path d="M12 8V12" stroke="#F59E0B" strokeWidth="2" strokeLinecap="round"/>
+                      <circle cx="12" cy="16" r="1.5" fill="#F59E0B"/>
                     </svg>
-                  </motion.div>
-                ))}
-              </div>
+                    <h3 className="suggestions-title">
+                      Possible Additional Items
+                    </h3>
+                  </div>
+                  <p className="suggestions-description">
+                    🟡 These items were detected with lower confidence. Click to select ones you have.
+                  </p>
+                  <div className="detected-grid">
+                    {suggestions.map((sug, idx) => {
+                      const isSelected = selectedSuggestions.has(sug.name)
+                      return (
+                        <motion.div
+                          key={sug.name}
+                          className={`detected-item suggestion-item ${isSelected ? 'selected' : ''}`}
+                          initial={{ opacity: 0, scale: 0.8 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          transition={{ delay: idx * 0.1 }}
+                          onClick={() => toggleSuggestion(sug.name)}
+                        >
+                          <div className="item-icon">
+                            <div className="ingredient-badge">
+                              {sug.name.charAt(0).toUpperCase()}
+                            </div>
+                          </div>
+                          <span className="item-name">
+                            {sug.name}
+                            {` ${(sug.confidence * 100).toFixed(1)}%`}
+                          </span>
+                          {isSelected && (
+                            <svg 
+                              style={{ 
+                                position: 'absolute', 
+                                top: '8px', 
+                                right: '8px', 
+                                width: '20px', 
+                                height: '20px',
+                                stroke: '#F59E0B'
+                              }} 
+                              viewBox="0 0 24 24" 
+                              fill="none" 
+                              xmlns="http://www.w3.org/2000/svg"
+                            >
+                              <path d="M20 6L9 17L4 12" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+                            </svg>
+                          )}
+                        </motion.div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+
               <div className="action-buttons">
                 <GlassButton
                   variant="secondary"
                   onClick={() => {
                     setDetectedItems([])
                     setUploadedImage(null)
+                    setOriginalImage(null)
+                    setPredictions([])
+                    setSuggestions([])
+                    setSelectedSuggestions(new Set())
+                    setDeselectedPredictions(new Set())
+                    setHasDetected(false)
                   }}
                 >
                   Upload New Photo
@@ -297,6 +460,11 @@ export const CameraPage = () => {
                   onClick={() => {
                     setDetectedItems([])
                     setUploadedImage(null)
+                    setOriginalImage(null)
+                    setPredictions([])
+                    setSuggestions([])
+                    setSelectedSuggestions(new Set())
+                    setDeselectedPredictions(new Set())
                     setHasDetected(false)
                   }}
                 >

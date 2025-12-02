@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { signOut, getAccessToken } from '../services/supabase';
+import { signOut, getAccessToken, ensureValidToken } from '../services/supabase';
 import './Navbar.css';
 
 interface NavbarProps {
@@ -13,24 +13,49 @@ export default function Navbar({ isSignedIn }: NavbarProps) {
   const [authState, setAuthState] = useState(false);
 
   useEffect(() => {
-    const checkAuth = () => {
+    const checkAuth = async () => {
       const token = getAccessToken();
       console.log('Navbar - checking auth, token:', token);
-      const isAuth = isSignedIn ?? !!token;
-      console.log('Navbar - authState:', isAuth);
-      setAuthState(isAuth);
+      
+      if (token) {
+        // Validate token is still valid
+        const isValid = await ensureValidToken();
+        console.log('Navbar - token valid:', isValid);
+        setAuthState(isValid);
+        
+        if (!isValid) {
+          // Token invalid/expired and couldn't refresh, sign out
+          await signOut();
+          navigate('/login');
+        }
+      } else {
+        setAuthState(false);
+      }
     };
     
     checkAuth();
+    
+    // Check auth state every 60 seconds while component is mounted
+    const intervalId = setInterval(checkAuth, 60000);
     
     const handleStorageChange = () => {
       console.log('Navbar - storage changed');
       checkAuth();
     };
+
+    const handleAuthChanged = (_event: Event) => {
+      console.log('Navbar - auth changed event received');
+      checkAuth();
+    };
     
     window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
-  }, [isSignedIn]);
+    window.addEventListener('auth-changed', handleAuthChanged);
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('auth-changed', handleAuthChanged);
+      clearInterval(intervalId);
+    };
+  }, [isSignedIn, navigate]);
 
   const handleSignIn = () => {
     navigate('/login');
