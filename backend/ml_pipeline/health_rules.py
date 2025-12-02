@@ -1,15 +1,9 @@
-"""
-Health risk rules and keyword matching for ingredient classification.
-Maps ingredient names to health risk categories.
-"""
 
-# Keywords indicating high cholesterol risk
 CHOLESTEROL_KEYWORDS = [
     'egg', 'yolk', 'liver', 'organ', 'kidney', 'brain', 'shrimp', 'lobster',
     'cheese', 'butter', 'cream', 'whole milk', 'lard', 'tallow', 'ghee'
 ]
 
-# Keywords for heart disease risk (high saturated fat, sodium)
 HEART_DISEASE_KEYWORDS = [
     'bacon', 'sausage', 'salami', 'pepperoni', 'hot dog', 'processed meat',
     'red meat', 'beef', 'pork', 'lamb', 'butter', 'lard', 'tallow', 'palm oil',
@@ -17,28 +11,24 @@ HEART_DISEASE_KEYWORDS = [
     'smoked', 'cured', 'salted', 'sodium'
 ]
 
-# Keywords for diabetes risk (high sugar, refined carbs)
 DIABETES_KEYWORDS = [
     'sugar', 'syrup', 'honey', 'candy', 'chocolate', 'sweet', 'dessert',
     'cake', 'cookie', 'pastry', 'donut', 'soda', 'juice', 'refined flour',
     'white bread', 'white rice', 'pasta', 'sweetened', 'frosting', 'glaze'
 ]
 
-# Keywords for hypertension/high blood pressure (high sodium)
 HYPERTENSION_KEYWORDS = [
     'salt', 'sodium', 'soy sauce', 'fish sauce', 'bouillon', 'broth',
     'canned', 'pickled', 'cured', 'smoked', 'processed', 'frozen meal',
     'instant', 'package', 'seasoning mix', 'salted', 'brine'
 ]
 
-# Keywords for obesity risk (high calorie density, unhealthy fats)
 OBESITY_KEYWORDS = [
     'fried', 'deep fried', 'battered', 'breaded', 'butter', 'oil', 'lard',
     'mayonnaise', 'cream', 'cheese sauce', 'gravy', 'fast food', 'junk food',
     'chips', 'fries', 'nugget', 'ice cream', 'milkshake', 'dessert'
 ]
 
-# Healthy ingredients (low risk)
 HEALTHY_KEYWORDS = [
     'vegetable', 'fruit', 'leafy', 'spinach', 'kale', 'broccoli', 'carrot',
     'apple', 'banana', 'berry', 'citrus', 'whole grain', 'oat', 'quinoa',
@@ -48,23 +38,6 @@ HEALTHY_KEYWORDS = [
 
 
 def classify_ingredient_health_risk(ingredient_name: str) -> dict:
-    """
-    Classify an ingredient based on health risk keywords.
-    
-    Args:
-        ingredient_name: Name of the ingredient (lowercase)
-    
-    Returns:
-        Dictionary with risk flags:
-        {
-            'high_cholesterol': bool,
-            'heart_disease': bool,
-            'diabetes': bool,
-            'hypertension': bool,
-            'obesity': bool,
-            'healthy': bool
-        }
-    """
     name_lower = ingredient_name.lower()
     
     risks = {
@@ -80,15 +53,6 @@ def classify_ingredient_health_risk(ingredient_name: str) -> dict:
 
 
 def get_risk_level(risks: dict) -> str:
-    """
-    Determine overall risk level based on individual risk flags.
-    
-    Args:
-        risks: Dictionary of risk flags from classify_ingredient_health_risk
-    
-    Returns:
-        Risk level: 'low', 'moderate', 'high', 'very_high'
-    """
     # Count number of risk factors
     risk_count = sum([
         risks['high_cholesterol'],
@@ -114,15 +78,6 @@ def get_risk_level(risks: dict) -> str:
 
 
 def analyze_recipe_risks(ingredients: list) -> dict:
-    """
-    Analyze health risks for a complete recipe.
-    
-    Args:
-        ingredients: List of ingredient names
-    
-    Returns:
-        Dictionary with aggregated risk analysis
-    """
     all_risks = {
         'high_cholesterol': 0,
         'heart_disease': 0,
@@ -172,7 +127,6 @@ def analyze_recipe_risks(ingredients: list) -> dict:
 
 
 def generate_warnings(risk_percentages: dict) -> list:
-    """Generate human-readable warnings based on risk percentages."""
     warnings = []
     
     if risk_percentages['high_cholesterol'] > 20:

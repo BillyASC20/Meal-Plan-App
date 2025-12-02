@@ -7,7 +7,6 @@ from PIL import Image, ImageDraw, ImageFont
 import numpy as np
 
 class YOLOFoodDetector:
-    """High-quality YOLO-based food detection service with comprehensive error handling."""
     
     DEFAULT_MODEL_PATH = os.getenv('YOLO_MODEL_PATH', 'best8.pt')
     DEFAULT_FONT_PATHS = [
@@ -18,15 +17,6 @@ class YOLOFoodDetector:
     MAX_IMAGE_SIZE = 10 * 1024 * 1024  # 10MB
     
     def __init__(self, model_path: Optional[str] = None):
-        """Initialize YOLO detector with specified or default model.
-        
-        Args:
-            model_path: Path to YOLO model weights file. If None, uses DEFAULT_MODEL_PATH.
-            
-        Raises:
-            FileNotFoundError: If model file doesn't exist
-            RuntimeError: If model fails to load
-        """
         self.model_path = model_path or self.DEFAULT_MODEL_PATH
         self.is_ready = False
         self.model = None
@@ -53,27 +43,12 @@ class YOLOFoodDetector:
             raise RuntimeError(f"Model initialization failed: {e}") from e
 
     def detect_and_draw_boxes(
-        self, 
-        image_data: str, 
-        topk: int = 25, 
-        score_thresh: float = 0.35,
-        low_thresh: float = 0.20
+           self,
+           image_data: str,
+           topk: int = 25,
+           score_thresh: float = 0.5,
+           low_thresh: float = 0.2
     ) -> Dict[str, any]:
-        """Detect food items and draw bounding boxes on image.
-        
-        Args:
-            image_data: Base64-encoded image string
-            topk: Maximum number of unique detections to return
-            score_thresh: High confidence threshold (auto-selected items)
-            low_thresh: Low confidence threshold (user-selectable suggestions)
-            
-        Returns:
-            Dict containing 'detections' (high conf), 'suggestions' (low conf), and 'image_with_boxes'
-            
-        Raises:
-            ValueError: If input validation fails
-            RuntimeError: If detection fails
-        """
         if not self.is_ready or not self.model:
             raise RuntimeError("Model not initialized")
         
@@ -145,13 +120,14 @@ class YOLOFoodDetector:
             
             for det in all_detections:
                 label_lower = det['label'].lower()
+                conf = det['confidence']
                 if label_lower not in seen:
                     seen.add(label_lower)
-                    if det['confidence'] >= score_thresh:
+                    if conf >= score_thresh:
                         high_confidence.append(det)
-                    else:
+                    elif low_thresh <= conf < score_thresh:
                         low_confidence.append(det)
-                    
+                    # Ignore detections below low_thresh
                     if len(high_confidence) + len(low_confidence) >= topk:
                         break
             
@@ -207,16 +183,6 @@ class YOLOFoodDetector:
             raise RuntimeError(f"Detection failed: {e}") from e
 
     def _draw_boxes(self, image: Image.Image, detections: List[Dict], high_thresh: float = 0.35) -> Image.Image:
-        """Draw bounding boxes and labels on image with different colors for confidence levels.
-        
-        Args:
-            image: PIL Image object
-            detections: List of detection dictionaries
-            high_thresh: Threshold to determine high vs low confidence colors
-            
-        Returns:
-            Image with drawn boxes
-        """
         draw = ImageDraw.Draw(image)
         font = self._get_font()
         
@@ -265,7 +231,6 @@ class YOLOFoodDetector:
         return image
     
     def _get_font(self, size: int = 20) -> ImageFont.ImageFont:
-        """Get font for drawing labels, with fallback options."""
         if self._font is not None:
             return self._font
         
@@ -281,7 +246,6 @@ class YOLOFoodDetector:
         return self._font
 
     def _image_to_data_url(self, image: Image.Image) -> str:
-        """Convert PIL Image to base64 data URL."""
         buffered = io.BytesIO()
         image.save(buffered, format="JPEG", quality=90)
         img_str = base64.b64encode(buffered.getvalue()).decode()
