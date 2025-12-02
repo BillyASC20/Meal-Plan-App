@@ -11,14 +11,9 @@ class YOLOFoodDetector:
         try:
             from ultralytics import YOLO
             
-            try:
-                print("[yolo] Attempting to load YOLOv8m (medium) for better accuracy...")
-                self.model = YOLO('yolov8m.pt')
-                print("[yolo] ✅ Loaded YOLOv8m (medium) - better accuracy than nano")
-            except Exception as e:
-                print(f"[yolo] Could not load medium model, using nano: {e}")
-                self.model = YOLO('yolov8n.pt')
-                print("[yolo] ✅ Loaded YOLOv8n (nano)")
+            print("[yolo] Loading best8.pt custom trained model...")
+            self.model = YOLO('best8.pt')
+            print("[yolo] ✅ Loaded best8.pt custom model")
             
             self.is_ready = True
             print("[yolo] ⚠️  Note: COCO dataset has limited food classes")
@@ -28,7 +23,7 @@ class YOLOFoodDetector:
             print(f"[yolo] ❌ Failed to load YOLOv8: {e}")
             raise
 
-    def detect_and_draw_boxes(self, image_data, topk=25, score_thresh=0.15):
+    def detect_and_draw_boxes(self, image_data, topk=25, score_thresh=0.35):
         try:
             if ',' in image_data:
                 image_data = image_data.split(',')[1]
