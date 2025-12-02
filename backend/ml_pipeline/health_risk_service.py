@@ -1,23 +1,14 @@
-"""
-Integration module for using health risk classifier in the main backend.
-"""
 
 import sys
 from pathlib import Path
-
-# Add ml-pipeline to path
 ml_pipeline_path = Path(__file__).parent
 sys.path.insert(0, str(ml_pipeline_path))
-
 from predict import HealthRiskPredictor
 from health_rules import analyze_recipe_risks
 
 
 class HealthRiskService:
-    """Service for checking ingredient health risks in recipes."""
-    
     def __init__(self, model_dir=None):
-        """Initialize the health risk service."""
         if model_dir is None:
             # Try backend/ml_models first (Docker/production), then ml-pipeline/models (local dev)
             backend_models = Path(__file__).parent.parent / 'ml_models'
@@ -41,15 +32,6 @@ class HealthRiskService:
             self.predictor = None
     
     def analyze_ingredients(self, ingredients: list) -> dict:
-        """
-        Analyze health risks for a list of ingredients.
-        
-        Args:
-            ingredients: List of ingredient names/strings
-        
-        Returns:
-            Dictionary with health risk analysis
-        """
         if self.ml_available:
             # Use ML predictor
             return self.predictor.predict_recipe(ingredients)
@@ -58,60 +40,32 @@ class HealthRiskService:
             return analyze_recipe_risks(ingredients)
     
     def get_ingredient_warnings(self, ingredients: list) -> list:
-        """
-        Get human-readable warnings for ingredients.
-        
-        Args:
-            ingredients: List of ingredient names
-        
-        Returns:
-            List of warning strings
-        """
         analysis = self.analyze_ingredients(ingredients)
         return analysis.get('warnings', [])
     
     def is_high_risk(self, ingredients: list) -> bool:
-        """
-        Check if ingredients contain high health risks.
-        
-        Args:
-            ingredients: List of ingredient names
-        
-        Returns:
-            True if overall risk is high, False otherwise
-        """
         analysis = self.analyze_ingredients(ingredients)
         return analysis.get('overall_risk') == 'high'
     
     def get_risk_summary(self, ingredients: list) -> dict:
-        """
-        Get simplified risk summary for frontend display.
-        
-        Args:
-            ingredients: List of ingredient names
-        
-        Returns:
-            Simplified risk summary dict
-        """
         analysis = self.analyze_ingredients(ingredients)
         
-        # Extract individual ingredient risks from ML predictions
         ingredient_details = []
         if 'ml_predictions' in analysis:
             for pred in analysis['ml_predictions']:
                 risk_level = pred.get('risk_level_ml', 'unknown')
                 is_high_risk = risk_level in ['high', 'very_high']
-                
-                # Get specific risk factors for this ingredient
                 individual_risks = pred.get('individual_risks', {})
                 risk_types = [k.replace('_', ' ').title() for k, v in individual_risks.items() if v and k != 'healthy']
-                
+                confidence = pred.get('confidence', 0)
+                confidence_type = 'high' if confidence >= 0.5 else ('low' if confidence >= 0.2 else 'none')
                 ingredient_details.append({
                     'name': pred.get('ingredient', ''),
                     'risk_level': risk_level,
                     'is_high_risk': is_high_risk,
                     'risk_types': risk_types,
-                    'confidence': pred.get('confidence', 0)
+                    'confidence': confidence,
+                    'confidence_type': confidence_type
                 })
         
         return {

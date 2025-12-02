@@ -1,6 +1,3 @@
-"""
-Prediction script for classifying ingredient health risks.
-"""
 
 import argparse
 import joblib
@@ -13,10 +10,8 @@ from feature_engineering import normalize_ingredient_name
 
 
 class HealthRiskPredictor:
-    """Predict health risks for ingredients using trained ML model."""
     
     def __init__(self, model_dir='models'):
-        """Load trained model and associated objects."""
         model_dir = Path(model_dir)
         
         try:
@@ -33,12 +28,6 @@ class HealthRiskPredictor:
             raise
     
     def predict_single(self, ingredient: str) -> Dict:
-        """
-        Predict health risk for a single ingredient.
-        
-        Returns:
-            Dictionary with prediction results
-        """
         # Normalize ingredient name
         ingredient_normalized = normalize_ingredient_name(ingredient)
         
@@ -68,7 +57,6 @@ class HealthRiskPredictor:
         }
     
     def predict_batch(self, ingredients: List[str]) -> pd.DataFrame:
-        """Predict health risks for multiple ingredients."""
         results = []
         for ingredient in ingredients:
             result = self.predict_single(ingredient)
@@ -77,7 +65,6 @@ class HealthRiskPredictor:
         return pd.DataFrame(results)
     
     def predict_recipe(self, ingredients: List[str]) -> Dict:
-        """Analyze health risks for a complete recipe."""
         # Get individual predictions
         individual_predictions = self.predict_batch(ingredients)
         
@@ -96,7 +83,6 @@ class HealthRiskPredictor:
 
 
 def print_prediction_result(result: Dict):
-    """Pretty print prediction result."""
     print("\n" + "=" * 60)
     print(f"INGREDIENT: {result['ingredient']}")
     print("=" * 60)
@@ -118,7 +104,6 @@ def print_prediction_result(result: Dict):
 
 
 def print_recipe_analysis(analysis: Dict):
-    """Pretty print recipe analysis."""
     print("\n" + "=" * 60)
     print("RECIPE HEALTH RISK ANALYSIS")
     print("=" * 60)

@@ -1,7 +1,3 @@
-"""
-Feature engineering for ingredient health risk classification.
-Extracts features from ingredient names and descriptions.
-"""
 
 import re
 import numpy as np
@@ -9,7 +5,6 @@ from typing import List, Dict
 
 
 class IngredientFeatureExtractor:
-    """Extract features from ingredient names for ML classification."""
     
     def __init__(self):
         # Nutritional keywords
@@ -21,12 +16,6 @@ class IngredientFeatureExtractor:
         self.natural_keywords = ['fresh', 'raw', 'whole', 'organic', 'natural']
         
     def extract_features(self, ingredient_name: str) -> Dict[str, float]:
-        """
-        Extract features from a single ingredient name.
-        
-        Returns:
-            Dictionary of feature values
-        """
         name_lower = ingredient_name.lower()
         
         features = {
@@ -60,12 +49,6 @@ class IngredientFeatureExtractor:
         return features
     
     def extract_batch_features(self, ingredient_names: List[str]) -> np.ndarray:
-        """
-        Extract features for multiple ingredients.
-        
-        Returns:
-            2D numpy array of shape (n_samples, n_features)
-        """
         feature_list = []
         for name in ingredient_names:
             features = self.extract_features(name)
@@ -74,23 +57,11 @@ class IngredientFeatureExtractor:
         return np.array(feature_list)
     
     def get_feature_names(self) -> List[str]:
-        """Get list of feature names in order."""
         sample_features = self.extract_features("sample ingredient")
         return list(sample_features.keys())
 
 
 def create_ngram_features(ingredient_names: List[str], n: int = 2) -> Dict:
-    """
-    Create character n-gram features for ingredient names.
-    Useful for capturing patterns in ingredient terminology.
-    
-    Args:
-        ingredient_names: List of ingredient names
-        n: N-gram size (default 2 for bigrams)
-    
-    Returns:
-        Dictionary mapping n-grams to their frequencies
-    """
     ngram_counts = {}
     
     for name in ingredient_names:
@@ -104,14 +75,6 @@ def create_ngram_features(ingredient_names: List[str], n: int = 2) -> Dict:
 
 
 def normalize_ingredient_name(name: str) -> str:
-    """
-    Normalize ingredient name for better matching.
-    
-    - Convert to lowercase
-    - Remove extra whitespace
-    - Remove special characters
-    - Standardize common abbreviations
-    """
     # Lowercase
     name = name.lower()
     
