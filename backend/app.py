@@ -289,26 +289,45 @@ def generate_recipes_stream():
                                 'image_url': image_url,
                                 'ingredients': ingredients
                             }).execute()
-                            
-                            search_id = search_result.data[0]['id']
-                            print(f"[stream] Created search record: {search_id}")
-                            
-                            recipes_to_insert = []
-                            for recipe in recipes:
-                                recipes_to_insert.append({
-                                    'search_id': search_id,
-                                    'title': recipe.get('title'),
-                                    'ingredients': recipe.get('ingredients'),
-                                    'steps': recipe.get('steps'),
-                                    'cooking_time': recipe.get('cookingTime') or recipe.get('cook_time'),
-                                    'difficulty': recipe.get('difficulty'),
-                                    'servings': str(recipe.get('servings', '')),
-                                    'calories': recipe.get('calories')
-                                })
-                            
-                            print(f"[stream] Inserting {len(recipes_to_insert)} recipes...")
-                            supabase.table('recipes').insert(recipes_to_insert).execute()
-                            print(f"[stream] ✅ Saved {len(recipes_to_insert)} recipes to database")
+
+                            # check search insert result
+                            if hasattr(search_result, 'error') and search_result.error:
+                                print(f"[stream] ❌ Failed to create search record: {search_result.error}")
+                            elif not getattr(search_result, 'data', None):
+                                print(f"[stream] ❌ No data returned from search insert: {search_result}")
+                            else:
+                                search_id = search_result.data[0].get('id')
+                                print(f"[stream] Created search record: {search_id}")
+
+                                recipes_to_insert = []
+                                for recipe in recipes:
+                                    # normalize fields and types before insert
+                                    cooking_time = recipe.get('cookingTime') or recipe.get('cook_time')
+                                    servings = recipe.get('servings')
+                                    try:
+                                        if servings is not None:
+                                            servings = int(servings)
+                                    except Exception:
+                                        # leave as-is if conversion fails
+                                        pass
+
+                                    recipes_to_insert.append({
+                                        'search_id': search_id,
+                                        'title': recipe.get('title'),
+                                        'ingredients': recipe.get('ingredients'),
+                                        'steps': recipe.get('steps'),
+                                        'cooking_time': cooking_time,
+                                        'difficulty': recipe.get('difficulty'),
+                                        'servings': servings
+                                    })
+
+                                print(f"[stream] Inserting {len(recipes_to_insert)} recipes...")
+                                insert_result = supabase.table('recipes').insert(recipes_to_insert).execute()
+                                if hasattr(insert_result, 'error') and insert_result.error:
+                                    print(f"[stream] ❌ Error inserting recipes: {insert_result.error}")
+                                    print(f"[stream] Insert response: {insert_result}")
+                                else:
+                                    print(f"[stream] ✅ Saved {len(recipes_to_insert)} recipes to database")
                     else:
                         print(f"[stream] ⚠️ No recipes found in parsed data")
                         
@@ -791,24 +810,48 @@ def save_recipes():
             'image_url': image_url,
             'ingredients': ingredients
         }).execute()
-        
-        search_id = search_result.data[0]['id']
-        
+
+        if hasattr(search_result, 'error') and search_result.error:
+            return jsonify({
+                "status": "error",
+                "message": f"Failed to create search record: {search_result.error}"
+            }), 500
+
+        if not getattr(search_result, 'data', None):
+            return jsonify({
+                "status": "error",
+                "message": "No data returned from search insert"
+            }), 500
+
+        search_id = search_result.data[0].get('id')
+
         recipes_to_insert = []
         for recipe in recipes:
+            cooking_time = recipe.get('cookingTime') or recipe.get('cook_time')
+            servings = recipe.get('servings')
+            try:
+                if servings is not None:
+                    servings = int(servings)
+            except Exception:
+                pass
+
             recipes_to_insert.append({
                 'search_id': search_id,
                 'title': recipe.get('title'),
                 'ingredients': recipe.get('ingredients'),
                 'steps': recipe.get('steps'),
-                'cooking_time': recipe.get('cookingTime'),
+                'cooking_time': cooking_time,
                 'difficulty': recipe.get('difficulty'),
-                'servings': recipe.get('servings'),
-                'calories': recipe.get('calories')
+                'servings': servings
             })
-        
-        supabase.table('recipes').insert(recipes_to_insert).execute()
-        
+
+        insert_result = supabase.table('recipes').insert(recipes_to_insert).execute()
+        if hasattr(insert_result, 'error') and insert_result.error:
+            return jsonify({
+                "status": "error",
+                "message": f"Failed to insert recipes: {insert_result.error}"
+            }), 500
+
         return jsonify({
             "status": "success",
             "data": {
