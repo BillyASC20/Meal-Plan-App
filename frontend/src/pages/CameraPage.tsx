@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import { GlassCard } from '../components/GlassCard'
@@ -6,6 +6,7 @@ import { GlassButton } from '../components/GlassButton'
 import Navbar from '../components/Navbar'
 import './CameraPage.css'
 import { api } from '../components/api'
+import { getTimeOfDay, getRecommendedMealType, type MealType } from '../utils/timeOfDay'
 
 const ALLOWED_IMAGE_TYPES = new Set([
   'image/jpeg',
@@ -32,7 +33,17 @@ export const CameraPage = () => {
   const [showAuthModal, setShowAuthModal] = useState(false)
   const [imageKey, setImageKey] = useState(0)
   const [uploadError, setUploadError] = useState('')
+  const [mealType, setMealType] = useState<MealType>('breakfast')
+  const [showMealTypeModal, setShowMealTypeModal] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Automatically detect time of day and set meal type on component mount
+  useEffect(() => {
+    const timeOfDay = getTimeOfDay()
+    const recommendedMeal = getRecommendedMealType(timeOfDay)
+    setMealType(recommendedMeal)
+    console.log(`[CameraPage] Detected ${timeOfDay}, suggesting ${recommendedMeal}`)
+  }, [])
 
   const isAllowedFile = (file: File) => {
     const mimeType = file.type?.toLowerCase()
@@ -179,25 +190,37 @@ export const CameraPage = () => {
         setIsGenerating(true)
         
         console.log('[CameraPage] Generating recipes with ingredients:', allIngredients)
+        console.log('[CameraPage] Meal type:', mealType)
         const imageUrl = await api.uploadImage(uploadedImage)
         console.log('[CameraPage] Image uploaded:', imageUrl)
         
         navigate('/recipes', { 
           state: { 
             ingredients: allIngredients,
-            imageUrl: imageUrl
+            imageUrl: imageUrl,
+            mealType: mealType
           } 
         })
       } catch (err) {
         console.error('Error uploading image:', err)
-        navigate('/recipes', { state: { ingredients: allIngredients } })
+        navigate('/recipes', { 
+          state: { 
+            ingredients: allIngredients,
+            mealType: mealType
+          } 
+        })
       } finally {
         setIsGenerating(false)
       }
     } else {
       const saved = sessionStorage.getItem('detectedIngredients')
       const parsed = saved ? (JSON.parse(saved) as string[]) : []
-      navigate('/recipes', { state: { ingredients: parsed } })
+      navigate('/recipes', { 
+        state: { 
+          ingredients: parsed,
+          mealType: mealType
+        } 
+      })
     }
   }
 
@@ -212,6 +235,24 @@ export const CameraPage = () => {
         <h1 className="camera-title">Upload Ingredients</h1>
         <div className="spacer"></div>
       </div>
+
+      {/* Meal Type Selector Button */}
+      <motion.div 
+        className="meal-type-selector-container"
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.2 }}
+      >
+        <button 
+          className="meal-type-selector-btn"
+          onClick={() => setShowMealTypeModal(true)}
+        >
+          <span className="current-meal-type">
+            {mealType.charAt(0).toUpperCase() + mealType.slice(1)}
+          </span>
+          <span className="change-text">Click to change meal type</span>
+        </button>
+      </motion.div>
 
       <div className="camera-content">
         <GlassCard className="camera-container">
@@ -475,6 +516,107 @@ export const CameraPage = () => {
           </motion.div>
         )}
       </div>
+
+      {/* Meal Type Selection Modal */}
+      {showMealTypeModal && (
+        <div
+          className="modal-overlay"
+          onClick={() => setShowMealTypeModal(false)}
+        >
+          <motion.div
+            className="meal-type-modal"
+            initial={{ scale: 0.9, opacity: 0, y: 20 }}
+            animate={{ scale: 1, opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="modal-header">
+              <h2 className="modal-title">Select Meal Type</h2>
+              <p className="modal-subtitle">
+                It's currently <span className="time-badge">{getTimeOfDay()}</span>
+              </p>
+            </div>
+
+            <div className="meal-options-grid">
+              <button
+                className={`meal-option-card ${mealType === 'breakfast' ? 'active' : ''}`}
+                onClick={() => {
+                  setMealType('breakfast')
+                  setShowMealTypeModal(false)
+                }}
+              >
+                <div className="meal-option-content">
+                  <div className="meal-emoji">🍳</div>
+                  <div className="meal-text">
+                    <span className="meal-label">Breakfast</span>
+                    <span className="meal-description">Morning meals</span>
+                  </div>
+                  {mealType === 'breakfast' && (
+                    <div className="selected-indicator">
+                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                        <path d="M20 6L9 17L4 12" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                    </div>
+                  )}
+                </div>
+              </button>
+
+              <button
+                className={`meal-option-card ${mealType === 'lunch' ? 'active' : ''}`}
+                onClick={() => {
+                  setMealType('lunch')
+                  setShowMealTypeModal(false)
+                }}
+              >
+                <div className="meal-option-content">
+                  <div className="meal-emoji">🥗</div>
+                  <div className="meal-text">
+                    <span className="meal-label">Lunch</span>
+                    <span className="meal-description">Midday meals</span>
+                  </div>
+                  {mealType === 'lunch' && (
+                    <div className="selected-indicator">
+                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                        <path d="M20 6L9 17L4 12" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                    </div>
+                  )}
+                </div>
+              </button>
+
+              <button
+                className={`meal-option-card ${mealType === 'dinner' ? 'active' : ''}`}
+                onClick={() => {
+                  setMealType('dinner')
+                  setShowMealTypeModal(false)
+                }}
+              >
+                <div className="meal-option-content">
+                  <div className="meal-emoji">🍽️</div>
+                  <div className="meal-text">
+                    <span className="meal-label">Dinner</span>
+                    <span className="meal-description">Evening meals</span>
+                  </div>
+                  {mealType === 'dinner' && (
+                    <div className="selected-indicator">
+                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                        <path d="M20 6L9 17L4 12" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                    </div>
+                  )}
+                </div>
+              </button>
+            </div>
+
+            <button 
+              className="modal-close-btn"
+              onClick={() => setShowMealTypeModal(false)}
+            >
+              Cancel
+            </button>
+          </motion.div>
+        </div>
+      )}
 
       {/* Authentication Required Modal */}
       {showAuthModal && (

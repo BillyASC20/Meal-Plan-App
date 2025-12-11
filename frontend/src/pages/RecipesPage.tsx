@@ -30,6 +30,7 @@ export const RecipesPage = () => {
         const state = location.state as any
         const fromState = state?.ingredients as string[] | undefined
         const imageUrlFromState = state?.imageUrl as string | undefined
+        const mealTypeFromState = state?.mealType as string | undefined
         const fromStorage = sessionStorage.getItem('detectedIngredients')
         const parsed = fromStorage ? (JSON.parse(fromStorage) as string[]) : undefined
         const ingredientsToUse = (fromState && fromState.length > 0)
@@ -51,7 +52,8 @@ export const RecipesPage = () => {
           
           try {
             console.log('🚀 Starting to receive chunks from backend...')
-            for await (const chunk of api.generateRecipesStream(ingredientsToUse, imageUrlFromState || undefined)) {
+            console.log('🍽️ Meal type:', mealTypeFromState)
+            for await (const chunk of api.generateRecipesStream(ingredientsToUse, imageUrlFromState || undefined, mealTypeFromState)) {
               buffer += chunk
               lastChunkTime = Date.now()
               

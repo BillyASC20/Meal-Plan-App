@@ -212,10 +212,12 @@ def generate_recipes_stream():
         
         ingredients = data['ingredients']
         image_url = data.get('image_url')
+        meal_type = data.get('meal_type')
         
         print(f"[stream] Received request:")
         print(f"[stream]   - Ingredients: {ingredients}")
         print(f"[stream]   - Image URL: {image_url}")
+        print(f"[stream]   - Meal Type: {meal_type}")
         
         auth_header = request.headers.get('Authorization')
         user_id = None
@@ -240,7 +242,7 @@ def generate_recipes_stream():
             chunk_count = 0
             try:
                 print(f"[stream] Starting OpenAI stream for {len(ingredients)} ingredients...")
-                for chunk in recipe_gen.openai_service.generate_recipes_stream(ingredients):
+                for chunk in recipe_gen.openai_service.generate_recipes_stream(ingredients, meal_type=meal_type):
                     full_content += chunk
                     chunk_count += 1
                     yield f"data: {json.dumps({'chunk': chunk})}\n\n"

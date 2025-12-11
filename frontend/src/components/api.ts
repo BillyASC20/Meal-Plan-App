@@ -168,16 +168,20 @@ async function generateRecipes(ingredients: string[]): Promise<RecipeResult> {
   return data as RecipeResult
 }
 
-async function* generateRecipesStream(ingredients: string[], imageUrl?: string): AsyncGenerator<string, void, unknown> {
+async function* generateRecipesStream(ingredients: string[], imageUrl?: string, mealType?: string): AsyncGenerator<string, void, unknown> {
   await ensureValidToken()
   
-  console.log('[API] generateRecipesStream called with:', { ingredients, imageUrl })
+  console.log('[API] generateRecipesStream called with:', { ingredients, imageUrl, mealType })
   
   const headers = getAuthHeaders()
+  const requestBody: any = { ingredients }
+  if (imageUrl) requestBody.image_url = imageUrl
+  if (mealType) requestBody.meal_type = mealType
+  
   const res = await fetch(`${BASE_URL}/generate-recipes-stream`, {
     method: 'POST',
     headers,
-    body: JSON.stringify({ ingredients, image_url: imageUrl })
+    body: JSON.stringify(requestBody)
   })
   
   console.log('[API] Stream response status:', res.status)
@@ -190,7 +194,7 @@ async function* generateRecipesStream(ingredients: string[], imageUrl?: string):
       const newRes = await fetch(`${BASE_URL}/generate-recipes-stream`, {
         method: 'POST',
         headers: newHeaders,
-        body: JSON.stringify({ ingredients, image_url: imageUrl })
+        body: JSON.stringify(requestBody)
       })
       if (newRes.ok && newRes.body) {
         yield* processStream(newRes)
