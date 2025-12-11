@@ -10,6 +10,29 @@ from auth_middleware import require_auth
 
 load_dotenv()
 
+# Validate critical environment variables at startup
+FRONTEND_URL = os.getenv('FRONTEND_URL')
+IS_RAILWAY = os.getenv('RAILWAY_ENVIRONMENT_NAME') is not None
+
+if not FRONTEND_URL:
+    if IS_RAILWAY:
+        # On Railway without FRONTEND_URL = crash to force you to set it
+        raise RuntimeError(
+            "FRONTEND_URL environment variable is required on Railway. "
+            "Add it in Railway dashboard: Variables tab → Add FRONTEND_URL=https://your-frontend.up.railway.app"
+        )
+    else:
+        # Local dev without FRONTEND_URL = just warn
+        print("=" * 80)
+        print("⚠️  WARNING: FRONTEND_URL is not set!")
+        print("=" * 80)
+        print("Email links will fallback to localhost. Set FRONTEND_URL for production.")
+        print("=" * 80)
+elif not FRONTEND_URL.startswith(('http://', 'https://')):
+    raise RuntimeError(f"Invalid FRONTEND_URL: {FRONTEND_URL}. Must start with http:// or https://")
+else:
+    print(f"[app] ✅ FRONTEND_URL configured: {FRONTEND_URL}")
+
 vision_service = None
 
 try:
@@ -385,9 +408,35 @@ def auth_signup():
                 "message": "Email and password required"
             }), 400
         
+        # Use configured FRONTEND_URL (required for email confirmation to work in production)
+        configured_frontend = os.getenv('FRONTEND_URL')
+        
+        if not configured_frontend:
+            # Fallback: try to detect from request headers (works for password reset but NOT for signup email)
+            request_origin = request.headers.get('Origin')
+            if not request_origin:
+                request_referer = request.headers.get('Referer')
+                if request_referer:
+                    from urllib.parse import urlparse
+                    parsed = urlparse(request_referer)
+                    if parsed.scheme and parsed.netloc:
+                        request_origin = f"{parsed.scheme}://{parsed.netloc}"
+            
+            configured_frontend = request_origin or 'http://localhost:3000'
+        
+        redirect_to = f"{configured_frontend.rstrip('/')}/auth/callback"
+        
+        print(f"[signup] Email: {email}")
+        print(f"[signup] Configured FRONTEND_URL: {os.getenv('FRONTEND_URL')}")
+        print(f"[signup] Origin header: {request.headers.get('Origin')}")
+        print(f"[signup] Final redirect URL: {redirect_to}")
+        
         response = supabase.auth.sign_up({
             "email": email,
-            "password": password
+            "password": password,
+            "options": {
+                "email_redirect_to": redirect_to
+            }
         })
         
         return jsonify({
