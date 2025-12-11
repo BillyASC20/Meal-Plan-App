@@ -9,7 +9,7 @@ import numpy as np
 class YOLOFoodDetector:
     """High-quality YOLO-based food detection service with comprehensive error handling."""
     
-    DEFAULT_MODEL_PATH = os.getenv('YOLO_MODEL_PATH', 'best8.pt')
+    DEFAULT_MODEL_PATH = os.getenv('YOLO_MODEL_PATH', 'best.pt')
     DEFAULT_FONT_PATHS = [
         "/System/Library/Fonts/Helvetica.ttc",  # macOS
         "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",  # Linux
