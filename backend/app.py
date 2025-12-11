@@ -385,9 +385,43 @@ def auth_signup():
                 "message": "Email and password required"
             }), 400
         
+        # Dynamic URL detection (same logic as reset-password)
+        configured_frontend = os.getenv('FRONTEND_URL')
+        request_origin = request.headers.get('Origin')
+        request_referer = request.headers.get('Referer')
+        if not request_origin and request_referer:
+            from urllib.parse import urlparse
+            parsed = urlparse(request_referer)
+            if parsed.scheme and parsed.netloc:
+                request_origin = f"{parsed.scheme}://{parsed.netloc}"
+
+        forwarded_proto = request.headers.get('X-Forwarded-Proto')
+        forwarded_host = request.headers.get('X-Forwarded-Host')
+        forwarded_port = request.headers.get('X-Forwarded-Port')
+        forwarded_url = None
+        if forwarded_host:
+            scheme = forwarded_proto or 'https'
+            host_value = forwarded_host
+            if forwarded_port and forwarded_port not in ('80', '443') and ':' not in host_value:
+                host_value = f"{host_value}:{forwarded_port}"
+            forwarded_url = f"{scheme}://{host_value}"
+
+        fallback_host = (forwarded_url or (request.host_url.rstrip('/') if request.host_url else None) or 'http://localhost:5001')
+        frontend_url = (configured_frontend or request_origin or fallback_host).rstrip('/')
+        redirect_to = f"{frontend_url}/auth/callback"
+        
+        print(f"[signup] Email: {email}")
+        print(f"[signup] Origin header: {request.headers.get('Origin')}")
+        print(f"[signup] Referer header: {request.headers.get('Referer')}")
+        print(f"[signup] X-Forwarded headers: proto={forwarded_proto}, host={forwarded_host}, port={forwarded_port}")
+        print(f"[signup] Final redirect URL: {redirect_to}")
+        
         response = supabase.auth.sign_up({
             "email": email,
-            "password": password
+            "password": password,
+            "options": {
+                "email_redirect_to": redirect_to
+            }
         })
         
         return jsonify({
